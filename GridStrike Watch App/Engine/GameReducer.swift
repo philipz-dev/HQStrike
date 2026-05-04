@@ -134,18 +134,24 @@ enum GameReducer {
             return
         }
 
-        // Northern grenade strike.
-        guard Zones.isNorthGrass(pos.row) else { return }  // irrelevant tap, keep banner
+        // Grenade strike — rows 0–4 (enemy grass) plus row 5 (enemy coastguard's water row).
+        guard Zones.isGrenadeTarget(pos.row) else { return }  // irrelevant tap, keep banner
         guard s.northernStrikes[pos] == nil else { return }
 
         // Drop any `.shotDown` banner now that a real strike is happening.
         s.phase = .play(.idle)
 
-        let isHit = mark == .headquarters || mark == .missile || mark == .bomber
+        let isHit = mark != nil
         s.northernStrikes[pos] = isHit ? .hit : .miss
         effects.append(.haptic(.notification))
-        if isHit, let unit = mark {
+        if let unit = mark {
             s.pendingDestructionAlerts.append(unit)
+            if unit == .coastguard {
+                // Coastguard is the only unit a grenade can actually remove from play —
+                // the tile reverts to empty water and bomber/missile attacks on its column
+                // are no longer intercepted.
+                s.board.marks.removeValue(forKey: pos)
+            }
         }
         if Rules.includesEnemyHQ(s.board, in: [pos]) {
             s.phase = .victory

@@ -64,7 +64,7 @@ struct BoardSnapshot: Equatable {
         let offCoastguard = isPlaceCoastguardOffFocus(at: pos, state: state)
 
         let strikeOverlay: ExplosionKind? = {
-            guard state.phase.isInGame, Zones.isNorthGrass(pos.row) else { return nil }
+            guard state.phase.isInGame, Zones.isGrenadeTarget(pos.row) else { return nil }
             return state.northernStrikes[pos]
         }()
 

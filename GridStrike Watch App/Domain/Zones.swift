@@ -34,11 +34,15 @@ enum Zones {
     static let missileTargetRows: ClosedRange<Int> = 1...4
     /// Allowed lower-left columns for a missile 2x2 (so c+1 stays in range).
     static let missileTargetColumns: ClosedRange<Int> = 0...3
+    /// Rows the player can grenade-strike during play. Includes the enemy grass (0–4) and the enemy
+    /// coastguard's water row (5) so the player can take out the coastguard before mounting a column attack.
+    static let grenadeTargetRows: ClosedRange<Int> = 0...5
 
     static func isNorthGrass(_ row: Int) -> Bool { northGrass.contains(row) }
     static func isWater(_ row: Int) -> Bool { waterRows.contains(row) }
     static func isSouthGrass(_ row: Int) -> Bool { southGrass.contains(row) }
     static func isAnyGrass(_ row: Int) -> Bool { isNorthGrass(row) || isSouthGrass(row) }
+    static func isGrenadeTarget(_ row: Int) -> Bool { grenadeTargetRows.contains(row) }
 
     static func isBombingTarget(_ pos: GridPosition) -> Bool {
         bombingTargetRows.contains(pos.row) && allColumns.contains(pos.col)
