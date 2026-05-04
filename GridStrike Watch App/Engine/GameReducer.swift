@@ -5,6 +5,10 @@
 //  Pure reducer driven by the typed `UIMode` enum and the explicit `Phase` machine.
 //  No bool flags — every gameplay decision falls out of an exhaustive switch.
 //
+//  Strike/overlay writes go through the symmetric `PerSide` maps in `GameState`;
+//  player-initiated attacks write to `[.opponent]`, leaving the `[.player]` half
+//  ready for the AI turn implementation.
+//
 
 import Foundation
 
@@ -114,7 +118,7 @@ enum GameReducer {
         }
     }
 
-    // MARK: - Idle / shot-down
+    // MARK: - Idle / shot-down (player attacks the opponent)
 
     private static func handleIdleTap(
         state s: inout GameState,
@@ -134,15 +138,15 @@ enum GameReducer {
             return
         }
 
-        // Grenade strike — rows 0–4 (enemy grass) plus row 5 (enemy coastguard's water row).
-        guard Zones.isGrenadeTarget(pos.row) else { return }  // irrelevant tap, keep banner
-        guard s.northernStrikes[pos] == nil else { return }
+        // Grenade strike — rows 0–5 (opponent grass + opponent coastguard row).
+        guard Zones.isGrenadeTarget(pos, attacker: .player) else { return }
+        guard s.grenadeStrikes[.opponent][pos] == nil else { return }
 
         // Drop any `.shotDown` banner now that a real strike is happening.
         s.phase = .play(.idle)
 
         let isHit = mark != nil
-        s.northernStrikes[pos] = isHit ? .hit : .miss
+        s.grenadeStrikes[.opponent][pos] = isHit ? .hit : .miss
         effects.append(.haptic(.notification))
         if let unit = mark {
             s.pendingDestructionAlerts.append(unit)
@@ -153,7 +157,7 @@ enum GameReducer {
                 s.board.marks.removeValue(forKey: pos)
             }
         }
-        if Rules.includesEnemyHQ(s.board, in: [pos]) {
+        if Rules.includesHQ(s.board, of: .opponent, in: [pos]) {
             s.phase = .victory
         }
     }
@@ -166,17 +170,18 @@ enum GameReducer {
         pos: GridPosition,
         effects: inout [SideEffect]
     ) {
-        guard Zones.isBombingTarget(pos) else { return }
+        guard Zones.isBombingTarget(pos, attacker: .player) else { return }
 
-        if Rules.bomberIntercepted(board: s.board, target: pos) {
-            s.planeInWater = GridPosition(Zones.planeInWaterRow, pos.col)
-            s.board.removeSouthernUnit(at: source, requiring: .bomber)
+        if Rules.bomberIntercepted(board: s.board, target: pos, attacker: .player) {
+            let wreckRow = Zones.shotDownRow(attacker: .player)
+            s.planeInWater[.player] = GridPosition(wreckRow, pos.col)
+            s.board.removeLauncher(at: source, requiring: .bomber, attacker: .player)
             s.phase = .play(.shotDown(.bomber))
             effects.append(.haptic(.notification))
             return
         }
 
-        applyBombDrop(state: &s, position: pos)
+        applyBombDrop(state: &s, position: pos, defender: .opponent)
         effects.append(.haptic(.notification))
         s.phase = .play(.bombingDrops(source: source, target: pos, dropsApplied: 1))
         effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
@@ -189,9 +194,9 @@ enum GameReducer {
         dropsApplied n: Int,
         effects: inout [SideEffect]
     ) {
-        let r = target.row - n
-        if r >= 0 {
-            applyBombDrop(state: &s, position: GridPosition(r, target.col))
+        let drops = Rules.bombingPositions(target: target, attacker: .player)
+        if n < drops.count {
+            applyBombDrop(state: &s, position: drops[n], defender: .opponent)
         }
         effects.append(.haptic(.notification))
 
@@ -200,18 +205,21 @@ enum GameReducer {
             s.phase = .play(.bombingDrops(source: source, target: target, dropsApplied: next))
             effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
         } else {
-            s.board.removeSouthernUnit(at: source, requiring: .bomber)
-            let bombed = Rules.bombingPositions(target: target)
-            s.phase = Rules.includesEnemyHQ(s.board, in: bombed) ? .victory : .play(.idle)
+            s.board.removeLauncher(at: source, requiring: .bomber, attacker: .player)
+            s.phase = Rules.includesHQ(s.board, of: .opponent, in: drops) ? .victory : .play(.idle)
         }
     }
 
-    private static func applyBombDrop(state s: inout GameState, position: GridPosition) {
+    private static func applyBombDrop(
+        state s: inout GameState,
+        position: GridPosition,
+        defender: Side
+    ) {
         if let unit = s.board.unit(at: position) {
-            s.bombingOverlays[position] = .hit
+            s.bombingOverlays[defender][position] = .hit
             s.pendingDestructionAlerts.append(unit)
         } else {
-            s.bombingOverlays[position] = .miss
+            s.bombingOverlays[defender][position] = .miss
         }
     }
 
@@ -223,27 +231,28 @@ enum GameReducer {
         pos: GridPosition,
         effects: inout [SideEffect]
     ) {
-        guard Zones.isMissileTarget(pos) else { return }
+        guard Zones.isMissileTarget(pos, attacker: .player) else { return }
 
-        if Rules.missileIntercepted(board: s.board, lowerLeft: pos) {
-            s.missileInWater = GridPosition(Zones.planeInWaterRow, pos.col)
-            s.board.removeSouthernUnit(at: source, requiring: .missile)
+        if Rules.missileIntercepted(board: s.board, anchor: pos, attacker: .player) {
+            let wreckRow = Zones.shotDownRow(attacker: .player)
+            s.missileInWater[.player] = GridPosition(wreckRow, pos.col)
+            s.board.removeLauncher(at: source, requiring: .missile, attacker: .player)
             s.phase = .play(.shotDown(.missile))
             effects.append(.haptic(.notification))
             return
         }
 
-        let cells = Rules.missilePositions(lowerLeft: pos)
+        let cells = Rules.missilePositions(anchor: pos, attacker: .player)
         for c in cells {
             if let unit = s.board.unit(at: c) {
-                s.missileOverlays[c] = .hit
+                s.missileOverlays[.opponent][c] = .hit
                 s.pendingDestructionAlerts.append(unit)
             } else {
-                s.missileOverlays[c] = .miss
+                s.missileOverlays[.opponent][c] = .miss
             }
         }
         effects.append(.haptic(.notification))
-        s.board.removeSouthernUnit(at: source, requiring: .missile)
-        s.phase = Rules.includesEnemyHQ(s.board, in: cells) ? .victory : .play(.idle)
+        s.board.removeLauncher(at: source, requiring: .missile, attacker: .player)
+        s.phase = Rules.includesHQ(s.board, of: .opponent, in: cells) ? .victory : .play(.idle)
     }
 }

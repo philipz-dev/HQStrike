@@ -3,6 +3,8 @@
 //  GridStrike Watch App
 //
 //  Single source of truth for the whole game. All UI is derived from this struct.
+//  Strike/overlay maps are split per side so the symmetric AI turn (phase 3) can
+//  write to its own half without touching the player-attacks-opponent path.
 //
 
 import Foundation
@@ -10,11 +12,25 @@ import Foundation
 struct GameState: Equatable {
     var phase: Phase
     var board: Board
-    var northernStrikes: [GridPosition: ExplosionKind]
-    var bombingOverlays: [GridPosition: ExplosionKind]
-    var missileOverlays: [GridPosition: ExplosionKind]
-    var planeInWater: GridPosition?
-    var missileInWater: GridPosition?
+
+    /// Grenade strikes against each side. `grenadeStrikes[.opponent]` holds the
+    /// player's grenade taps on rows 0…5; `grenadeStrikes[.player]` will hold the
+    /// opponent's grenade taps on rows 8…13 once AI turns are wired up.
+    var grenadeStrikes: PerSide<[GridPosition: ExplosionKind]>
+
+    /// Bomber drop overlays per defender side.
+    var bombingOverlays: PerSide<[GridPosition: ExplosionKind]>
+
+    /// Missile 2x2 overlays per defender side.
+    var missileOverlays: PerSide<[GridPosition: ExplosionKind]>
+
+    /// Plane-in-water wreckage when an attacker's bomber is shot down. Indexed by
+    /// the attacker so we know which water row to render it on.
+    var planeInWater: PerSide<GridPosition?>
+
+    /// Missile-in-water wreckage when an attacker's missile is shot down.
+    var missileInWater: PerSide<GridPosition?>
+
     var pendingDestructionAlerts: [Unit]
     var scrollTarget: Int?
 
@@ -22,11 +38,11 @@ struct GameState: Equatable {
         GameState(
             phase: .welcome,
             board: .empty,
-            northernStrikes: [:],
-            bombingOverlays: [:],
-            missileOverlays: [:],
-            planeInWater: nil,
-            missileInWater: nil,
+            grenadeStrikes: PerSide(both: [:]),
+            bombingOverlays: PerSide(both: [:]),
+            missileOverlays: PerSide(both: [:]),
+            planeInWater: PerSide(both: nil),
+            missileInWater: PerSide(both: nil),
             pendingDestructionAlerts: [],
             scrollTarget: nil
         )

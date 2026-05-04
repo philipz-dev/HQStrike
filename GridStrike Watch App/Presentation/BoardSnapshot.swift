@@ -3,7 +3,9 @@
 //  GridStrike Watch App
 //
 //  One-pass projection from GameState → render data for every tile + banner + modal.
-//  Driven entirely by `phase` / `mode`; no bool flags.
+//  Driven entirely by `phase` / `mode`; no bool flags. Strike/overlay reads are
+//  side-aware so the same renderer covers both halves of the board once AI turns
+//  start writing into `[.player]`.
 //
 
 import Foundation
@@ -64,19 +66,32 @@ struct BoardSnapshot: Equatable {
         let offCoastguard = isPlaceCoastguardOffFocus(at: pos, state: state)
 
         let strikeOverlay: ExplosionKind? = {
-            guard state.phase.isInGame, Zones.isGrenadeTarget(pos.row) else { return nil }
-            return state.northernStrikes[pos]
+            guard state.phase.isInGame else { return nil }
+            // Each tile only ever carries strikes against its own side. Mid-water
+            // rows (6, 7) belong to no side and stay clean.
+            guard let side = Zones.side(forRow: pos.row) else { return nil }
+            // Grenade strikes are valid on the defender's grass + their coastguard row.
+            // For .opponent that's rows 0–5; for .player rows 8–13. We inspect both
+            // dimensions here so the original "rows 0–5" check still holds.
+            let grenadeAttacker = side.opposite
+            guard Zones.isGrenadeTarget(pos, attacker: grenadeAttacker) else { return nil }
+            return state.grenadeStrikes[side][pos]
         }()
 
         let dropOverlay: ExplosionKind? = {
             guard state.phase.isInGame else { return nil }
-            return state.bombingOverlays[pos] ?? state.missileOverlays[pos]
+            guard let side = Zones.side(forRow: pos.row) else { return nil }
+            return state.bombingOverlays[side][pos] ?? state.missileOverlays[side][pos]
         }()
 
         let wreck: WaterWreck? = {
             guard state.phase.isInGame else { return nil }
-            if state.planeInWater == pos { return .plane }
-            if state.missileInWater == pos { return .missile }
+            // Plane/missile-in-water sits on the *attacker*'s wreck row, which
+            // belongs to a `Side` keyed by attacker.
+            for attacker in Side.allCases {
+                if state.planeInWater[attacker] == pos { return .plane }
+                if state.missileInWater[attacker] == pos { return .missile }
+            }
             return nil
         }()
 

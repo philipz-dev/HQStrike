@@ -26,20 +26,30 @@ struct Board: Equatable {
 
     func unit(at position: GridPosition) -> Unit? { marks[position] }
 
-    /// Returns the enemy coastguard's column (the one on the northern water row), if any.
-    var enemyCoastguardColumn: Int? {
-        for col in Zones.allColumns where marks[GridPosition(Zones.coastguardEnemyRow, col)] == .coastguard {
+    /// Returns the coastguard column of the requested side, if its coastguard is
+    /// still on the board.
+    func coastguardColumn(of side: Side) -> Int? {
+        let row = Zones.coastguardRow(of: side)
+        for col in Zones.allColumns where marks[GridPosition(row, col)] == .coastguard {
             return col
         }
         return nil
     }
 
-    /// Removes a southern unit at the given key if it's still present. Used after an attack
-    /// or a coastguard interception to clear the launcher tile.
-    mutating func removeSouthernUnit(at position: GridPosition, requiring unit: Unit) {
-        guard Zones.isSouthGrass(position.row) else { return }
+    /// Back-compat alias for the player-attacks-opponent code paths.
+    var enemyCoastguardColumn: Int? { coastguardColumn(of: .opponent) }
+
+    /// Removes a launcher unit (bomber/missile) from `attacker`'s home grass after
+    /// it has fired. Symmetric replacement for the old "remove southern unit" helper.
+    mutating func removeLauncher(at position: GridPosition, requiring unit: Unit, attacker: Side) {
+        guard Zones.grassRows(of: attacker).contains(position.row) else { return }
         guard marks[position] == unit else { return }
         marks.removeValue(forKey: position)
         if unit == .bomber { bomberRotations.removeValue(forKey: position) }
+    }
+
+    /// Back-compat alias used by older code paths that always assumed `.player`.
+    mutating func removeSouthernUnit(at position: GridPosition, requiring unit: Unit) {
+        removeLauncher(at: position, requiring: unit, attacker: .player)
     }
 }
