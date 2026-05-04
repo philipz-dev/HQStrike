@@ -22,4 +22,8 @@ enum HapticType: Equatable {
 enum SideEffect: Equatable {
     case haptic(HapticType)
     case scheduleAdvanceBombDrop(afterSeconds: Double)
+    /// Reducer signals that the opponent should make its next move after the given
+    /// delay. The store interprets this by asking its `OpponentPolicy` for the next
+    /// `Action` and dispatching it.
+    case scheduleOpponentTurn(afterSeconds: Double)
 }

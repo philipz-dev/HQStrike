@@ -62,7 +62,9 @@ enum PlayState: Equatable {
     /// Idle, no banner, ready for a new attack or grenade strike.
     case idle
     /// Idle banner shows the most recent shoot-down message; cleared by the next attack.
-    case shotDown(Weapon)
+    /// `attacker` identifies whose weapon got shot down so the banner can pick the
+    /// correct phrasing (your bomber vs enemy bomber).
+    case shotDown(Weapon, attacker: Side)
     case choosingBombTarget(source: GridPosition)
     case bombingDrops(source: GridPosition, target: GridPosition, dropsApplied: Int)
     case choosingMissileTarget(source: GridPosition)
@@ -72,16 +74,18 @@ enum Phase: Equatable {
     case welcome
     case setup(SetupStep)
     case play(PlayState)
-    /// Terminal: enemy HQ has been hit. Only `.newGame` exits this state.
+    /// Terminal: the player hit the opponent's HQ. Only `.newGame` exits this state.
     case victory
+    /// Terminal: the opponent hit the player's HQ. Only `.newGame` exits this state.
+    case defeat
 }
 
 extension Phase {
-    /// True for `.play` and `.victory` — visually treated as "in-game" (board renders
-    /// strikes, hides enemy art, etc.) even when the victory modal is up.
+    /// True for `.play`, `.victory` and `.defeat` — visually treated as "in-game"
+    /// (board renders strikes, hides enemy art, etc.) even when the end-game modal is up.
     var isInGame: Bool {
         switch self {
-        case .play, .victory: return true
+        case .play, .victory, .defeat: return true
         case .welcome, .setup: return false
         }
     }

@@ -31,6 +31,12 @@ struct GameRootView: View {
                     store.send(.newGame)
                 }
 
+            case .defeat:
+                PlayContainerView(snapshot: snapshot)
+                DefeatOverlay {
+                    store.send(.newGame)
+                }
+
             case .setup, .play:
                 PlayContainerView(snapshot: snapshot)
             }

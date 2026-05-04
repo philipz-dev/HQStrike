@@ -3,16 +3,22 @@
 //  GridStrike Watch App
 //
 //  Pure reducer driven by the typed `UIMode` enum and the explicit `Phase` machine.
-//  No bool flags — every gameplay decision falls out of an exhaustive switch.
-//
-//  Strike/overlay writes go through the symmetric `PerSide` maps in `GameState`;
-//  player-initiated attacks write to `[.opponent]`, leaving the `[.player]` half
-//  ready for the AI turn implementation.
+//  Every attack is parameterised on `state.currentTurn`, so the same code path
+//  handles player and opponent offensives. After each attack fully resolves the
+//  reducer flips the turn and — if the opponent is up next — schedules its move.
 //
 
 import Foundation
 
 enum GameReducer {
+    /// Delay before the opponent makes its first move after an attack fully resolves.
+    private static let opponentPostAttackDelay: Double = 0.5
+    /// Slightly longer pause after a shoot-down so the player can read the banner.
+    private static let opponentPostShotDownDelay: Double = 1.5
+    /// Delay between sequential opponent taps within the same turn (e.g. bomber
+    /// source-tap → target-tap).
+    private static let opponentInterTapDelay: Double = 0.5
+
     static func reduce<R: RandomNumberGenerator>(
         state: GameState,
         action: Action,
@@ -32,7 +38,10 @@ enum GameReducer {
             if !s.pendingDestructionAlerts.isEmpty {
                 s.pendingDestructionAlerts.removeFirst()
             }
-            return (s, [])
+            // After the last alert, the next opponent step (if any) might have been
+            // waiting — re-evaluate the scheduling tail before returning.
+            appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
+            return (s, effects)
 
         case .advanceBombDrop:
             // Internal scheduled action — runs regardless of modal so a HQ-hit during
@@ -46,6 +55,7 @@ enum GameReducer {
                     effects: &effects
                 )
             }
+            appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
             return (s, effects)
 
         case .dismissWelcome:
@@ -58,8 +68,8 @@ enum GameReducer {
 
         case .tap(let pos):
             switch s.mode {
-            case .destructionAlert, .victory:
-                return (s, [])  // modal blocks user input
+            case .destructionAlert, .victory, .defeat:
+                return (s, [])  // modal blocks input
             case .welcome:
                 s.phase = .setup(.placeHeadquarter)
                 return (s, [])
@@ -68,6 +78,7 @@ enum GameReducer {
                 return (s, [])
             case .play(let play):
                 handlePlayTap(state: &s, playState: play, pos: pos, effects: &effects)
+                appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
                 return (s, effects)
             }
         }
@@ -94,6 +105,7 @@ enum GameReducer {
         } else {
             EnemySpawner.apply(board: &s.board, rng: &rng)
             s.phase = .play(.idle)
+            s.currentTurn = .player
         }
     }
 
@@ -118,35 +130,38 @@ enum GameReducer {
         }
     }
 
-    // MARK: - Idle / shot-down (player attacks the opponent)
+    // MARK: - Idle / shot-down (attacker = state.currentTurn)
 
     private static func handleIdleTap(
         state s: inout GameState,
         pos: GridPosition,
         effects: inout [SideEffect]
     ) {
+        let attacker = s.currentTurn
         let mark = s.board.unit(at: pos)
+        let attackerGrass = Zones.grassRows(of: attacker)
 
         // Tap own bomber / missile to start an attack — phase change implicitly clears
         // any `.shotDown` banner.
-        if Zones.isSouthGrass(pos.row), mark == .bomber {
+        if attackerGrass.contains(pos.row), mark == .bomber {
             s.phase = .play(.choosingBombTarget(source: pos))
             return
         }
-        if Zones.isSouthGrass(pos.row), mark == .missile {
+        if attackerGrass.contains(pos.row), mark == .missile {
             s.phase = .play(.choosingMissileTarget(source: pos))
             return
         }
 
-        // Grenade strike — rows 0–5 (opponent grass + opponent coastguard row).
-        guard Zones.isGrenadeTarget(pos, attacker: .player) else { return }
-        guard s.grenadeStrikes[.opponent][pos] == nil else { return }
+        // Grenade strike on the defender's grass + coastguard row.
+        guard Zones.isGrenadeTarget(pos, attacker: attacker) else { return }
+        let defender = attacker.opposite
+        guard s.grenadeStrikes[defender][pos] == nil else { return }
 
         // Drop any `.shotDown` banner now that a real strike is happening.
         s.phase = .play(.idle)
 
         let isHit = mark != nil
-        s.grenadeStrikes[.opponent][pos] = isHit ? .hit : .miss
+        s.grenadeStrikes[defender][pos] = isHit ? .hit : .miss
         effects.append(.haptic(.notification))
         if let unit = mark {
             s.pendingDestructionAlerts.append(unit)
@@ -157,9 +172,11 @@ enum GameReducer {
                 s.board.marks.removeValue(forKey: pos)
             }
         }
-        if Rules.includesHQ(s.board, of: .opponent, in: [pos]) {
-            s.phase = .victory
+        if Rules.includesHQ(s.board, of: defender, in: [pos]) {
+            s.phase = endGamePhase(forAttacker: attacker)
+            return
         }
+        endTurn(state: &s)
     }
 
     // MARK: - Bombing
@@ -170,18 +187,20 @@ enum GameReducer {
         pos: GridPosition,
         effects: inout [SideEffect]
     ) {
-        guard Zones.isBombingTarget(pos, attacker: .player) else { return }
+        let attacker = s.currentTurn
+        guard Zones.isBombingTarget(pos, attacker: attacker) else { return }
 
-        if Rules.bomberIntercepted(board: s.board, target: pos, attacker: .player) {
-            let wreckRow = Zones.shotDownRow(attacker: .player)
-            s.planeInWater[.player] = GridPosition(wreckRow, pos.col)
-            s.board.removeLauncher(at: source, requiring: .bomber, attacker: .player)
-            s.phase = .play(.shotDown(.bomber))
+        if Rules.bomberIntercepted(board: s.board, target: pos, attacker: attacker) {
+            let wreckRow = Zones.shotDownRow(attacker: attacker)
+            s.planeInWater[attacker] = GridPosition(wreckRow, pos.col)
+            s.board.removeLauncher(at: source, requiring: .bomber, attacker: attacker)
+            s.phase = .play(.shotDown(.bomber, attacker: attacker))
             effects.append(.haptic(.notification))
+            endTurn(state: &s)
             return
         }
 
-        applyBombDrop(state: &s, position: pos, defender: .opponent)
+        applyBombDrop(state: &s, position: pos, defender: attacker.opposite)
         effects.append(.haptic(.notification))
         s.phase = .play(.bombingDrops(source: source, target: pos, dropsApplied: 1))
         effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
@@ -194,9 +213,10 @@ enum GameReducer {
         dropsApplied n: Int,
         effects: inout [SideEffect]
     ) {
-        let drops = Rules.bombingPositions(target: target, attacker: .player)
+        let attacker = s.currentTurn
+        let drops = Rules.bombingPositions(target: target, attacker: attacker)
         if n < drops.count {
-            applyBombDrop(state: &s, position: drops[n], defender: .opponent)
+            applyBombDrop(state: &s, position: drops[n], defender: attacker.opposite)
         }
         effects.append(.haptic(.notification))
 
@@ -205,8 +225,13 @@ enum GameReducer {
             s.phase = .play(.bombingDrops(source: source, target: target, dropsApplied: next))
             effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
         } else {
-            s.board.removeLauncher(at: source, requiring: .bomber, attacker: .player)
-            s.phase = Rules.includesHQ(s.board, of: .opponent, in: drops) ? .victory : .play(.idle)
+            s.board.removeLauncher(at: source, requiring: .bomber, attacker: attacker)
+            if Rules.includesHQ(s.board, of: attacker.opposite, in: drops) {
+                s.phase = endGamePhase(forAttacker: attacker)
+            } else {
+                s.phase = .play(.idle)
+                endTurn(state: &s)
+            }
         }
     }
 
@@ -231,28 +256,78 @@ enum GameReducer {
         pos: GridPosition,
         effects: inout [SideEffect]
     ) {
-        guard Zones.isMissileTarget(pos, attacker: .player) else { return }
+        let attacker = s.currentTurn
+        guard Zones.isMissileTarget(pos, attacker: attacker) else { return }
 
-        if Rules.missileIntercepted(board: s.board, anchor: pos, attacker: .player) {
-            let wreckRow = Zones.shotDownRow(attacker: .player)
-            s.missileInWater[.player] = GridPosition(wreckRow, pos.col)
-            s.board.removeLauncher(at: source, requiring: .missile, attacker: .player)
-            s.phase = .play(.shotDown(.missile))
+        if Rules.missileIntercepted(board: s.board, anchor: pos, attacker: attacker) {
+            let wreckRow = Zones.shotDownRow(attacker: attacker)
+            s.missileInWater[attacker] = GridPosition(wreckRow, pos.col)
+            s.board.removeLauncher(at: source, requiring: .missile, attacker: attacker)
+            s.phase = .play(.shotDown(.missile, attacker: attacker))
             effects.append(.haptic(.notification))
+            endTurn(state: &s)
             return
         }
 
-        let cells = Rules.missilePositions(anchor: pos, attacker: .player)
+        let defender = attacker.opposite
+        let cells = Rules.missilePositions(anchor: pos, attacker: attacker)
         for c in cells {
             if let unit = s.board.unit(at: c) {
-                s.missileOverlays[.opponent][c] = .hit
+                s.missileOverlays[defender][c] = .hit
                 s.pendingDestructionAlerts.append(unit)
             } else {
-                s.missileOverlays[.opponent][c] = .miss
+                s.missileOverlays[defender][c] = .miss
             }
         }
         effects.append(.haptic(.notification))
-        s.board.removeLauncher(at: source, requiring: .missile, attacker: .player)
-        s.phase = Rules.includesHQ(s.board, of: .opponent, in: cells) ? .victory : .play(.idle)
+        s.board.removeLauncher(at: source, requiring: .missile, attacker: attacker)
+        if Rules.includesHQ(s.board, of: defender, in: cells) {
+            s.phase = endGamePhase(forAttacker: attacker)
+        } else {
+            s.phase = .play(.idle)
+            endTurn(state: &s)
+        }
+    }
+
+    // MARK: - Turn management
+
+    /// Flips `currentTurn` after the active side has fully resolved an attack.
+    private static func endTurn(state s: inout GameState) {
+        s.currentTurn = s.currentTurn.opposite
+    }
+
+    /// HQ-hit terminal phase, picked from the perspective of the attacker.
+    private static func endGamePhase(forAttacker attacker: Side) -> Phase {
+        switch attacker {
+        case .player: return .victory
+        case .opponent: return .defeat
+        }
+    }
+
+    /// Appends `scheduleOpponentTurn` whenever the resolved state expects the
+    /// opponent to act next and no automatic timer (bomb-drop) is already running.
+    /// Idempotent-ish: callers invoke it once per reducer entry, not per mutation.
+    private static func appendOpponentSchedulingIfNeeded(
+        state s: GameState,
+        effects: inout [SideEffect]
+    ) {
+        guard s.currentTurn == .opponent else { return }
+        // Don't dispatch the AI while a destruction alert is up — wait for the
+        // player to acknowledge it first.
+        guard !s.isModalActive else { return }
+        guard case .play(let play) = s.phase else { return }
+
+        let delay: Double
+        switch play {
+        case .bombingDrops:
+            return                                     // advanceBombDrop drives this
+        case .shotDown:
+            delay = opponentPostShotDownDelay
+        case .choosingBombTarget, .choosingMissileTarget:
+            delay = opponentInterTapDelay              // mid-turn step
+        case .idle:
+            delay = opponentPostAttackDelay
+        }
+        effects.append(.scheduleOpponentTurn(afterSeconds: delay))
     }
 }

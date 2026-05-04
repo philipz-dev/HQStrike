@@ -4,8 +4,7 @@
 //
 //  One-pass projection from GameState → render data for every tile + banner + modal.
 //  Driven entirely by `phase` / `mode`; no bool flags. Strike/overlay reads are
-//  side-aware so the same renderer covers both halves of the board once AI turns
-//  start writing into `[.player]`.
+//  side-aware so the same renderer covers both halves of the board.
 //
 
 import Foundation
@@ -18,6 +17,7 @@ struct BoardSnapshot: Equatable {
     enum Modal: Equatable {
         case destructionAlert(Unit)
         case victory
+        case defeat
     }
 
     static func compute(_ state: GameState) -> BoardSnapshot {
@@ -34,6 +34,7 @@ struct BoardSnapshot: Equatable {
             switch state.mode {
             case .destructionAlert(let unit): return .destructionAlert(unit)
             case .victory: return .victory
+            case .defeat: return .defeat
             case .welcome, .setup, .play: return nil
             }
         }()
@@ -71,8 +72,7 @@ struct BoardSnapshot: Equatable {
             // rows (6, 7) belong to no side and stay clean.
             guard let side = Zones.side(forRow: pos.row) else { return nil }
             // Grenade strikes are valid on the defender's grass + their coastguard row.
-            // For .opponent that's rows 0–5; for .player rows 8–13. We inspect both
-            // dimensions here so the original "rows 0–5" check still holds.
+            // For .opponent that's rows 0–5; for .player rows 8–13.
             let grenadeAttacker = side.opposite
             guard Zones.isGrenadeTarget(pos, attacker: grenadeAttacker) else { return nil }
             return state.grenadeStrikes[side][pos]
@@ -86,8 +86,8 @@ struct BoardSnapshot: Equatable {
 
         let wreck: WaterWreck? = {
             guard state.phase.isInGame else { return nil }
-            // Plane/missile-in-water sits on the *attacker*'s wreck row, which
-            // belongs to a `Side` keyed by attacker.
+            // Plane/missile-in-water sits on the *attacker*'s wreck row, indexed by
+            // the attacker side.
             for attacker in Side.allCases {
                 if state.planeInWater[attacker] == pos { return .plane }
                 if state.missileInWater[attacker] == pos { return .missile }
@@ -95,7 +95,9 @@ struct BoardSnapshot: Equatable {
             return nil
         }()
 
-        let isSelected = state.phase.targetingSource == pos
+        // The selection border only applies to player-driven targeting; during the
+        // opponent's turn the AI's hidden launcher should not flash a border.
+        let isSelected = state.currentTurn == .player && state.phase.targetingSource == pos
 
         let border: TileBorder = {
             if isSelected { return .selected }
@@ -140,16 +142,20 @@ struct BoardSnapshot: Equatable {
     }
 
     private static func ghostMode(at pos: GridPosition, state: GameState) -> DimMode {
+        // Ghost dim only applies to player-driven targeting; during the opponent's
+        // turn the board renders normally (the AI plans behind the scenes).
+        let isPlayerTurn = state.currentTurn == .player
+
         switch state.phase {
-        case .play(.choosingBombTarget(let src)):
+        case .play(.choosingBombTarget(let src)) where isPlayerTurn:
             if pos == src { return .none }
             return Zones.bombingTargetRows.contains(pos.row) ? .none : .normal
 
-        case .play(.choosingMissileTarget(let src)):
+        case .play(.choosingMissileTarget(let src)) where isPlayerTurn:
             if pos == src { return .none }
             return Zones.isMissileTarget(pos) ? .none : .normal
 
-        case .play, .victory:
+        case .play, .victory, .defeat:
             return .none
 
         case .setup(.placeCoastguard):
@@ -173,12 +179,15 @@ struct BoardSnapshot: Equatable {
         if state.isModalActive { return true }
 
         switch state.phase {
-        case .welcome, .victory:
+        case .welcome, .victory, .defeat:
             return false
         case .setup(let step):
             if mark != nil { return false }
             return !step.isValidPlacement(pos.row)
         case .play(let play):
+            // Block all taps during the opponent's turn — the reducer would refuse
+            // them anyway, but disabling at the view level keeps the watch UI snappy.
+            if state.currentTurn != .player { return true }
             switch play {
             case .choosingMissileTarget:
                 return !(Zones.isMissileTarget(pos) || isSelected)

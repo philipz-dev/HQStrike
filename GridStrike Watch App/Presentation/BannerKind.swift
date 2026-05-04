@@ -13,19 +13,31 @@ enum BannerKind: Equatable {
     case place(SetupStep)
     case defineBombArea
     case defineMissileStrike
-    case bomberShotDown
-    case missileShotDown
+    case shotDown(Weapon, attacker: Side)
     case setupComplete
+    case opponentThinking
 
     var localized: String {
         switch self {
-        case .none: return ""
-        case .place(let step): return step.instruction
-        case .defineBombArea: return "Define bombing area!"
-        case .defineMissileStrike: return "Define missile strike!"
-        case .bomberShotDown: return Weapon.bomber.shotDownText
-        case .missileShotDown: return Weapon.missile.shotDownText
-        case .setupComplete: return "Setup complete"
+        case .none:
+            return ""
+        case .place(let step):
+            return step.instruction
+        case .defineBombArea:
+            return "Define bombing area!"
+        case .defineMissileStrike:
+            return "Define missile strike!"
+        case .shotDown(let weapon, let attacker):
+            switch (weapon, attacker) {
+            case (.bomber, .player): return "Bomber shot down by enemy coastguard!"
+            case (.missile, .player): return "Missile shot down by enemy coastguard!"
+            case (.bomber, .opponent): return "Enemy bomber shot down by your coastguard!"
+            case (.missile, .opponent): return "Enemy missile shot down by your coastguard!"
+            }
+        case .setupComplete:
+            return "Setup complete"
+        case .opponentThinking:
+            return "Opponent thinking…"
         }
     }
 }
@@ -33,22 +45,20 @@ enum BannerKind: Equatable {
 extension GameState {
     var banner: BannerKind {
         switch mode {
-        case .destructionAlert, .victory, .welcome:
+        case .destructionAlert, .victory, .defeat, .welcome:
             return .none
         case .setup(let step):
             return .place(step)
         case .play(let play):
             switch play {
             case .idle:
-                return .setupComplete
-            case .shotDown(.bomber):
-                return .bomberShotDown
-            case .shotDown(.missile):
-                return .missileShotDown
+                return currentTurn == .player ? .setupComplete : .opponentThinking
+            case .shotDown(let weapon, let attacker):
+                return .shotDown(weapon, attacker: attacker)
             case .choosingBombTarget:
-                return .defineBombArea
+                return currentTurn == .player ? .defineBombArea : .opponentThinking
             case .choosingMissileTarget:
-                return .defineMissileStrike
+                return currentTurn == .player ? .defineMissileStrike : .opponentThinking
             case .bombingDrops:
                 return .none
             }
