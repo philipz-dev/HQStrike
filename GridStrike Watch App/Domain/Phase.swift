@@ -3,8 +3,8 @@
 //  GridStrike Watch App
 //
 //  Explicit state machine for the whole game flow. Replaces the loose collection of
-//  bool flags (bombingRunActive, missileChoosingTarget, …) so impossible combinations
-//  cannot exist.
+//  bool flags (bombingRunActive, missileChoosingTarget, victory, lastShotDown, …) so
+//  impossible combinations cannot exist.
 //
 
 import Foundation
@@ -59,7 +59,10 @@ enum SetupStep: CaseIterable, Equatable {
 }
 
 enum PlayState: Equatable {
+    /// Idle, no banner, ready for a new attack or grenade strike.
     case idle
+    /// Idle banner shows the most recent shoot-down message; cleared by the next attack.
+    case shotDown(Weapon)
     case choosingBombTarget(source: GridPosition)
     case bombingDrops(source: GridPosition, target: GridPosition, dropsApplied: Int)
     case choosingMissileTarget(source: GridPosition)
@@ -69,4 +72,27 @@ enum Phase: Equatable {
     case welcome
     case setup(SetupStep)
     case play(PlayState)
+    /// Terminal: enemy HQ has been hit. Only `.newGame` exits this state.
+    case victory
+}
+
+extension Phase {
+    /// True for `.play` and `.victory` — visually treated as "in-game" (board renders
+    /// strikes, hides enemy art, etc.) even when the victory modal is up.
+    var isInGame: Bool {
+        switch self {
+        case .play, .victory: return true
+        case .welcome, .setup: return false
+        }
+    }
+
+    /// While the player is choosing a bombing or missile target, this returns the
+    /// southern launcher tile so the board can highlight it without an extra branch.
+    var targetingSource: GridPosition? {
+        switch self {
+        case .play(.choosingBombTarget(let src)): return src
+        case .play(.choosingMissileTarget(let src)): return src
+        default: return nil
+        }
+    }
 }

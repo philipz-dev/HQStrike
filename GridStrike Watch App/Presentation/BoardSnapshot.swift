@@ -3,8 +3,7 @@
 //  GridStrike Watch App
 //
 //  One-pass projection from GameState → render data for every tile + banner + modal.
-//  Invoked once per BoardView body; replaces the inline conditional chains in the old
-//  `tileView` / `isVisuallyGhosted` / `buttonDisabled` closures.
+//  Driven entirely by `phase` / `mode`; no bool flags.
 //
 
 import Foundation
@@ -29,14 +28,13 @@ struct BoardSnapshot: Equatable {
             }
         }
 
-        let modal: Modal?
-        if let unit = state.pendingDestructionAlerts.first {
-            modal = .destructionAlert(unit)
-        } else if state.victory {
-            modal = .victory
-        } else {
-            modal = nil
-        }
+        let modal: Modal? = {
+            switch state.mode {
+            case .destructionAlert(let unit): return .destructionAlert(unit)
+            case .victory: return .victory
+            case .welcome, .setup, .play: return nil
+            }
+        }()
 
         return BoardSnapshot(tiles: tiles, banner: state.banner, modal: modal)
     }
@@ -47,7 +45,6 @@ struct BoardSnapshot: Equatable {
         let mark = state.board.unit(at: pos)
         let hideEnemyArt = hidesEnemyUnitArt(at: pos, state: state)
 
-        // Background image
         let background: TileBackground = {
             if hideEnemyArt {
                 return Zones.isWater(pos.row) ? .water : .grass
@@ -58,45 +55,32 @@ struct BoardSnapshot: Equatable {
             return Zones.isWater(pos.row) ? .water : .grass
         }()
 
-        // Bomber rotation only when bomber art is visible
         let bomberRotation: Double = {
             guard mark == .bomber, !hideEnemyArt else { return 0 }
             return state.board.bomberRotations[pos] ?? 0
         }()
 
-        // Ghosting
         let dim = ghostMode(at: pos, state: state)
         let offCoastguard = isPlaceCoastguardOffFocus(at: pos, state: state)
 
-        // Northern grenade overlay (rows 0–4) during play
         let strikeOverlay: ExplosionKind? = {
-            if case .play = state.phase, Zones.isNorthGrass(pos.row) {
-                return state.northernStrikes[pos]
-            }
-            return nil
+            guard state.phase.isInGame, Zones.isNorthGrass(pos.row) else { return nil }
+            return state.northernStrikes[pos]
         }()
 
-        // Bombing or missile overlay (combined; missile takes precedence only when there's no bombing entry)
         let dropOverlay: ExplosionKind? = {
-            guard case .play = state.phase else { return nil }
+            guard state.phase.isInGame else { return nil }
             return state.bombingOverlays[pos] ?? state.missileOverlays[pos]
         }()
 
-        // Water wreck on the row south of the enemy coastguard
         let wreck: WaterWreck? = {
-            guard case .play = state.phase else { return nil }
+            guard state.phase.isInGame else { return nil }
             if state.planeInWater == pos { return .plane }
             if state.missileInWater == pos { return .missile }
             return nil
         }()
 
-        let isSelected: Bool = {
-            switch state.phase {
-            case .play(.choosingBombTarget(let src)) where src == pos: return true
-            case .play(.choosingMissileTarget(let src)) where src == pos: return true
-            default: return false
-            }
-        }()
+        let isSelected = state.phase.targetingSource == pos
 
         let border: TileBorder = {
             if isSelected { return .selected }
@@ -127,10 +111,10 @@ struct BoardSnapshot: Equatable {
 
     // MARK: - Per-tile helpers
 
-    /// During play, opponent tiles on rows 0–5 hide their unit graphics.
+    /// During play (and post-victory while the modal is up), opponent tiles on rows 0–5
+    /// hide their unit graphics — strike/bomb logic still runs against `state.board`.
     private static func hidesEnemyUnitArt(at pos: GridPosition, state: GameState) -> Bool {
-        guard case .play = state.phase else { return false }
-        return pos.row <= Zones.coastguardEnemyRow
+        state.phase.isInGame && pos.row <= Zones.coastguardEnemyRow
     }
 
     private static func isPlaceCoastguardOffFocus(at pos: GridPosition, state: GameState) -> Bool {
@@ -150,7 +134,7 @@ struct BoardSnapshot: Equatable {
             if pos == src { return .none }
             return Zones.isMissileTarget(pos) ? .none : .normal
 
-        case .play:
+        case .play, .victory:
             return .none
 
         case .setup(.placeCoastguard):
@@ -174,7 +158,7 @@ struct BoardSnapshot: Equatable {
         if state.isModalActive { return true }
 
         switch state.phase {
-        case .welcome:
+        case .welcome, .victory:
             return false
         case .setup(let step):
             if mark != nil { return false }
@@ -185,7 +169,7 @@ struct BoardSnapshot: Equatable {
                 return !(Zones.isMissileTarget(pos) || isSelected)
             case .choosingBombTarget:
                 return !(Zones.isBombingTarget(pos) || isSelected)
-            case .idle, .bombingDrops:
+            case .idle, .shotDown, .bombingDrops:
                 return false
             }
         }

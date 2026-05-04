@@ -16,8 +16,6 @@ struct GameState: Equatable {
     var planeInWater: GridPosition?
     var missileInWater: GridPosition?
     var pendingDestructionAlerts: [Unit]
-    var lastShotDown: Weapon?
-    var victory: Bool
     var scrollTarget: Int?
 
     static func newGame() -> GameState {
@@ -30,14 +28,43 @@ struct GameState: Equatable {
             planeInWater: nil,
             missileInWater: nil,
             pendingDestructionAlerts: [],
-            lastShotDown: nil,
-            victory: false,
             scrollTarget: nil
         )
     }
+}
 
-    /// While true the grid must not respond to taps (modal overlay covers it).
+// MARK: - UIMode (single exhaustive switch over what the screen is showing)
+
+/// What the user is seeing right now. Combines `phase` + alert queue + victory into one
+/// enum so views and the reducer can use a single exhaustive switch instead of
+/// chained bool checks (`if !queue.isEmpty …`, `if victory …`, `if phase == .play …`).
+enum UIMode: Equatable {
+    case welcome
+    case setup(SetupStep)
+    case play(PlayState)
+    case destructionAlert(Unit)
+    case victory
+}
+
+extension GameState {
+    var mode: UIMode {
+        if let unit = pendingDestructionAlerts.first {
+            return .destructionAlert(unit)
+        }
+        switch phase {
+        case .welcome: return .welcome
+        case .setup(let step): return .setup(step)
+        case .play(let play): return .play(play)
+        case .victory: return .victory
+        }
+    }
+
+    /// Convenience derived from `mode`. The grid does not respond to taps in either
+    /// modal state. Replaces the previous `victory || !queue.isEmpty` pair.
     var isModalActive: Bool {
-        victory || !pendingDestructionAlerts.isEmpty
+        switch mode {
+        case .destructionAlert, .victory: return true
+        case .welcome, .setup, .play: return false
+        }
     }
 }

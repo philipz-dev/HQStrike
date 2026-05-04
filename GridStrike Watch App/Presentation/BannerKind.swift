@@ -2,8 +2,8 @@
 //  BannerKind.swift
 //  GridStrike Watch App
 //
-//  Typed instruction-text source. Replaces the cascading `if`s that previously lived
-//  inside `instructionText` in the view.
+//  Typed instruction-text source. Consumes `UIMode` so the cascading `if`s that used
+//  to live in `instructionText` collapse into one exhaustive switch.
 //
 
 import Foundation
@@ -32,27 +32,25 @@ enum BannerKind: Equatable {
 
 extension GameState {
     var banner: BannerKind {
-        if !pendingDestructionAlerts.isEmpty { return .none }
-        if victory { return .none }
-        switch phase {
-        case .welcome:
+        switch mode {
+        case .destructionAlert, .victory, .welcome:
             return .none
         case .setup(let step):
             return .place(step)
         case .play(let play):
             switch play {
+            case .idle:
+                return .setupComplete
+            case .shotDown(.bomber):
+                return .bomberShotDown
+            case .shotDown(.missile):
+                return .missileShotDown
             case .choosingBombTarget:
                 return .defineBombArea
             case .choosingMissileTarget:
                 return .defineMissileStrike
             case .bombingDrops:
                 return .none
-            case .idle:
-                switch lastShotDown {
-                case .bomber: return .bomberShotDown
-                case .missile: return .missileShotDown
-                case .none: return .setupComplete
-                }
             }
         }
     }

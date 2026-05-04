@@ -2,21 +2,42 @@
 //  Rules.swift
 //  GridStrike Watch App
 //
-//  Pure rule predicates. Easy to unit-test without any UI.
+//  Pure rule predicates and attack geometry. Easy to unit-test without any UI.
 //
 
 import Foundation
 
 enum Rules {
-    /// Bomber: 3 drops going north from `target`. Intercepted when the column matches the
-    /// enemy coastguard column AND at least one drop cell sits north of that water row.
-    static func bomberIntercepted(board: Board, target: GridPosition) -> Bool {
-        guard let coastCol = board.enemyCoastguardColumn, coastCol == target.col else { return false }
+    // MARK: - Attack footprints
+
+    /// 3-drop column going north from `target`. Out-of-bounds rows are filtered out.
+    static func bombingPositions(target: GridPosition) -> [GridPosition] {
+        var result: [GridPosition] = []
+        result.reserveCapacity(3)
         for i in 0..<3 {
             let r = target.row - i
-            if r >= 0 && r < Zones.coastguardEnemyRow { return true }
+            if r >= 0 { result.append(GridPosition(r, target.col)) }
         }
-        return false
+        return result
+    }
+
+    /// 2x2 missile footprint anchored at the lower-left.
+    static func missilePositions(lowerLeft pos: GridPosition) -> [GridPosition] {
+        [
+            pos,
+            GridPosition(pos.row, pos.col + 1),
+            GridPosition(pos.row - 1, pos.col),
+            GridPosition(pos.row - 1, pos.col + 1),
+        ]
+    }
+
+    // MARK: - Coastguard interception
+
+    /// Bomber: intercepted when the column matches the enemy coastguard's column AND
+    /// at least one drop cell is north of that water row.
+    static func bomberIntercepted(board: Board, target: GridPosition) -> Bool {
+        guard let coastCol = board.enemyCoastguardColumn, coastCol == target.col else { return false }
+        return bombingPositions(target: target).contains { $0.row < Zones.coastguardEnemyRow }
     }
 
     /// Missile 2x2 anchored at lower-left. The coastguard defends a single column. Intercept
@@ -28,5 +49,12 @@ enum Rules {
         if coastCol == lowerLeft.col { return true }
         if coastCol == lastCol && lowerLeft.col == lastCol - 1 { return true }
         return false
+    }
+
+    // MARK: - Victory
+
+    /// True iff any of the affected positions had the enemy HQ on it.
+    static func includesEnemyHQ(_ board: Board, in positions: [GridPosition]) -> Bool {
+        positions.contains { board.unit(at: $0) == .headquarters }
     }
 }

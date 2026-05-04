@@ -2,8 +2,8 @@
 //  GameRootView.swift
 //  GridStrike Watch App
 //
-//  Top-level switch — welcome vs. play container, plus the modal overlays. Reads from
-//  the GameStore and forwards intents back via `send`.
+//  Top-level switch — welcome vs. play container, plus the modal overlays. Uses one
+//  exhaustive switch over `UIMode` instead of separate optional/bool checks.
 //
 
 import SwiftUI
@@ -15,26 +15,24 @@ struct GameRootView: View {
         let snapshot = BoardSnapshot.compute(store.state)
 
         ZStack {
-            Group {
-                switch store.state.phase {
-                case .welcome:
-                    WelcomeView()
-                default:
-                    PlayContainerView(snapshot: snapshot)
-                }
-            }
+            switch store.state.mode {
+            case .welcome:
+                WelcomeView()
 
-            if let modal = snapshot.modal {
-                switch modal {
-                case .destructionAlert(let unit):
-                    DestructionAlertOverlay(unit: unit) {
-                        store.send(.acknowledgeDestructionAlert)
-                    }
-                case .victory:
-                    VictoryOverlay {
-                        store.send(.newGame)
-                    }
+            case .destructionAlert(let unit):
+                PlayContainerView(snapshot: snapshot)
+                DestructionAlertOverlay(unit: unit) {
+                    store.send(.acknowledgeDestructionAlert)
                 }
+
+            case .victory:
+                PlayContainerView(snapshot: snapshot)
+                VictoryOverlay {
+                    store.send(.newGame)
+                }
+
+            case .setup, .play:
+                PlayContainerView(snapshot: snapshot)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
