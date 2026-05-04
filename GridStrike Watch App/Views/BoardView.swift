@@ -3,7 +3,9 @@
 //  GridStrike Watch App
 //
 //  Scrollable 14×5 grid. Reads only from the precomputed snapshot — every tap is
-//  forwarded as `Action.tap(GridPosition)`.
+//  forwarded as `Action.tap(GridPosition)`. Reacts to `state.scrollRequest` so the
+//  reducer can pull the camera to whichever half is in the spotlight (the
+//  opponent's grass when the player is up, the player's grass when the AI is up).
 //
 
 import SwiftUI
@@ -21,7 +23,7 @@ struct BoardView: View {
     private var bottomRowScrollId: String { "row-\(Self.rows - 1)" }
 
     var body: some View {
-        let scrollTarget = store.state.scrollTarget
+        let scrollRequest = store.state.scrollRequest
 
         GeometryReader { geo in
             let tileSize = max(1, (geo.size.width - Self.horizontalPadding * 2) / CGFloat(Self.columns))
@@ -61,10 +63,12 @@ struct BoardView: View {
                         proxy.scrollTo(bottomRowScrollId, anchor: .bottom)
                     }
                 }
-                .onChange(of: scrollTarget) { _, newValue in
-                    guard let row = newValue else { return }
+                .onChange(of: scrollRequest) { _, newValue in
+                    guard let request = newValue else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
-                        proxy.scrollTo("row-\(row)", anchor: .center)
+                        withAnimation(.easeInOut(duration: 0.45)) {
+                            proxy.scrollTo("row-\(request.row)", anchor: .center)
+                        }
                     }
                 }
             }

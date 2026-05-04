@@ -12,11 +12,13 @@ import Foundation
 
 enum GameReducer {
     /// Delay before the opponent makes its first move after an attack fully resolves.
-    private static let opponentPostAttackDelay: Double = 0.5
+    /// Generous enough for the auto-scroll animation to complete and the
+    /// "Opponent thinking…" banner to register before the first impact lands.
+    private static let opponentPostAttackDelay: Double = 1.2
     /// Slightly longer pause after a shoot-down so the player can read the banner.
-    private static let opponentPostShotDownDelay: Double = 1.5
+    private static let opponentPostShotDownDelay: Double = 1.8
     /// Delay between sequential opponent taps within the same turn (e.g. bomber
-    /// source-tap → target-tap).
+    /// source-tap → target-tap). No scroll change happens here.
     private static let opponentInterTapDelay: Double = 0.5
 
     static func reduce<R: RandomNumberGenerator>(
@@ -100,12 +102,13 @@ enum GameReducer {
         if let next = step.next {
             s.phase = .setup(next)
             if next == .placeCoastguard {
-                s.scrollTarget = Zones.coastguardPlayerRow
+                s.requestScroll(to: Zones.coastguardPlayerRow)
             }
         } else {
             EnemySpawner.apply(board: &s.board, rng: &rng)
             s.phase = .play(.idle)
             s.currentTurn = .player
+            s.requestScroll(to: Zones.opponentOverviewRow)
         }
     }
 
@@ -291,9 +294,19 @@ enum GameReducer {
 
     // MARK: - Turn management
 
-    /// Flips `currentTurn` after the active side has fully resolved an attack.
+    /// Flips `currentTurn` after the active side has fully resolved an attack and
+    /// auto-scrolls the board to the half that's about to be in the spotlight —
+    /// the player's grass when the AI is up next, the opponent's grass when the
+    /// player is up next. The scroll always emits a fresh token so the view
+    /// re-animates even on identical row repeats across turns.
     private static func endTurn(state s: inout GameState) {
         s.currentTurn = s.currentTurn.opposite
+        switch s.currentTurn {
+        case .opponent:
+            s.requestScroll(to: Zones.playerOverviewRow)
+        case .player:
+            s.requestScroll(to: Zones.opponentOverviewRow)
+        }
     }
 
     /// HQ-hit terminal phase, picked from the perspective of the attacker.

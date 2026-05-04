@@ -9,6 +9,14 @@
 
 import Foundation
 
+/// One-shot scroll request emitted by the reducer. The `token` is a monotonic
+/// counter so two consecutive requests for the *same* row still register as a
+/// state change for SwiftUI's `onChange` and re-trigger the scroll animation.
+struct ScrollRequest: Equatable {
+    let row: Int
+    let token: Int
+}
+
 struct GameState: Equatable {
     var phase: Phase
 
@@ -38,7 +46,10 @@ struct GameState: Equatable {
     var missileInWater: PerSide<GridPosition?>
 
     var pendingDestructionAlerts: [Unit]
-    var scrollTarget: Int?
+
+    /// One-shot scroll request — set by the reducer, observed by the BoardView.
+    /// Use `requestScroll(to:)` to mutate so the token always advances.
+    var scrollRequest: ScrollRequest?
 
     static func newGame() -> GameState {
         GameState(
@@ -51,8 +62,16 @@ struct GameState: Equatable {
             planeInWater: PerSide(both: nil),
             missileInWater: PerSide(both: nil),
             pendingDestructionAlerts: [],
-            scrollTarget: nil
+            scrollRequest: nil
         )
+    }
+
+    /// Emit a fresh scroll request — use this from the reducer instead of writing
+    /// `scrollRequest` directly so the token always increases and `onChange` fires
+    /// even when the destination row repeats across turns.
+    mutating func requestScroll(to row: Int) {
+        let nextToken = (scrollRequest?.token ?? 0) &+ 1
+        scrollRequest = ScrollRequest(row: row, token: nextToken)
     }
 }
 

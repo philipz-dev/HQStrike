@@ -37,7 +37,7 @@ enum BannerKind: Equatable {
         case .setupComplete:
             return "Setup complete"
         case .opponentThinking:
-            return "Opponent thinking…"
+            return "Thinking…"
         }
     }
 }

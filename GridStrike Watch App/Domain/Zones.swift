@@ -31,6 +31,13 @@ enum Zones {
     /// (the wreckage drifts down toward the player after a shoot-down).
     static let planeInWaterRow = 6
 
+    /// Row to scroll to when the player is about to attack — keeps the opponent's
+    /// half (HQ row + their coastguard) in view.
+    static let opponentOverviewRow = 2
+    /// Row to scroll to when the opponent is about to attack — keeps the player's
+    /// half (their coastguard + grass) in view so they can watch the AI's impact.
+    static let playerOverviewRow = 11
+
     /// Allowed rows for choosing a bombing target (3 cells north of choice → row 0..4).
     static let bombingTargetRows: ClosedRange<Int> = 2...4
     /// Allowed lower-left rows for a missile 2x2.
