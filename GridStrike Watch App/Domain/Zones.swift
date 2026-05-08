@@ -71,6 +71,11 @@ enum Zones {
     /// produce only three in-bounds salvo cells because two diagonals fall off
     /// the side of the board.
     static let missileTargetColumns: ClosedRange<Int> = 0...4
+    /// Subset of `missileTargetColumns` whose anchor only delivers 3 of the
+    /// 5 X-pattern cells (the two off-board diagonals are dropped). Single
+    /// source of truth so the AI doesn't have to recompute "is this a
+    /// corner?" by hand in every targeting heuristic.
+    static let missileCornerColumns: Set<Int> = [0, 4]
     /// Rows the player can grenade-strike during play. Includes the enemy grass (0–4) and the enemy
     /// coastguard's water row (5) so the player can take out the coastguard before mounting a column attack.
     static let grenadeTargetRows: ClosedRange<Int> = 0...5

@@ -22,5 +22,11 @@ enum Action: Equatable {
     /// `pendingOpponentImpact` from state and applies it.
     case applyOpponentImpact
     case acknowledgeDestructionAlert
+    /// Player has reviewed the setup-confirm screen and wants to wipe the board
+    /// and start placing units again from the headquarters step.
+    case restartSetup
+    /// Player has reviewed the setup-confirm screen and wants to lock in the
+    /// current layout. Spawns the AI's units and transitions to play.
+    case confirmSetup
     case newGame
 }

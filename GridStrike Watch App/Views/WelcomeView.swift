@@ -56,15 +56,25 @@ struct WelcomeView: View {
             Button {
                 showHelp = true
             } label: {
-                Image(systemName: "questionmark.circle.fill")
+                // Outlined glyph (no filled disc behind the `?`) — the user
+                // asked for the help affordance to lose its background plate
+                // so the splash artwork shows through where the dark circle
+                // used to sit. A plain shadow keeps the white strokes
+                // readable against any region of the splash.
+                Image(systemName: "questionmark.circle")
                     .font(.system(size: 28, weight: .semibold))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, .black.opacity(0.6))
+                    .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
             }
             .buttonStyle(.plain)
-            .padding(.leading, 2)
+            .padding(.leading, 4)
             .padding(.top, 0)
+            // Pulls the glyph up into the bezel corner so it sits above the
+            // splash artwork's reticle ring instead of overlapping it. Pure
+            // visual offset — the safe-area padding above keeps the button's
+            // hit-target on screen, the offset just shifts where the glyph
+            // is drawn relative to that anchor.
+            .offset(y: -20)
             .accessibilityLabel("How to play")
         }
         .sheet(isPresented: $showHelp) {
@@ -78,41 +88,6 @@ struct WelcomeView: View {
     }
 }
 
-/// White text crisply outlined in black for use over a busy photographic
-/// background. Built from a ZStack of eight offset copies of the label
-/// (one per compass direction) drawn in the outline colour, with the fill
-/// version drawn on top — gives a hard, even border at any font size,
-/// unlike a soft `.shadow` which would smear.
-private struct OutlinedText: View {
-    let content: String
-    let font: Font
-    var fill: Color = .white
-    var outline: Color = .black
-    var outlineWidth: CGFloat = 1
-
-    init(_ content: String, font: Font) {
-        self.content = content
-        self.font = font
-    }
-
-    var body: some View {
-        ZStack {
-            outlineLayer(dx: -1, dy: -1)
-            outlineLayer(dx:  0, dy: -1)
-            outlineLayer(dx:  1, dy: -1)
-            outlineLayer(dx: -1, dy:  0)
-            outlineLayer(dx:  1, dy:  0)
-            outlineLayer(dx: -1, dy:  1)
-            outlineLayer(dx:  0, dy:  1)
-            outlineLayer(dx:  1, dy:  1)
-            Text(content).foregroundStyle(fill)
-        }
-        .font(font)
-    }
-
-    private func outlineLayer(dx: CGFloat, dy: CGFloat) -> some View {
-        Text(content)
-            .foregroundStyle(outline)
-            .offset(x: dx * outlineWidth, y: dy * outlineWidth)
-    }
-}
+// `OutlinedText` lives in its own file (`OutlinedText.swift`) so the help
+// screen header can reuse the same crisp black-edged label without the
+// type having to live as a `private` helper inside the welcome view.

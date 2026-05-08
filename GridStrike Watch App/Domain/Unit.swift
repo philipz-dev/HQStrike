@@ -23,10 +23,13 @@ enum Unit: Equatable, CaseIterable {
     }
 
     /// Lower-case singular noun used inside aggregated destruction sentences,
-    /// e.g. "missile" in "Missile and bomber destroyed!".
+    /// e.g. "missile" in "Missile and bomber destroyed!". "Headquarter" is
+    /// rendered without the trailing 's' in the singular per the in-game
+    /// copy ("Your headquarter is destroyed!"); the plural form below adds
+    /// it back when needed.
     var singularName: String {
         switch self {
-        case .headquarters: return "headquarters"
+        case .headquarters: return "headquarter"
         case .missile: return "missile"
         case .bomber: return "bomber"
         case .coastguard: return "coastguard"
@@ -34,9 +37,9 @@ enum Unit: Equatable, CaseIterable {
     }
 
     /// Lower-case plural noun used when the same unit type was destroyed
-    /// multiple times in a single attack, e.g. "2 missiles destroyed!".
-    /// "Headquarters" reads the same in singular and plural — kept identical
-    /// so a (theoretical) double-HQ kill still looks grammatical.
+    /// multiple times in a single attack, e.g. "2 missiles destroyed!". The
+    /// HQ plural keeps the trailing 's' so a (theoretical) double-HQ kill
+    /// still reads as "2 headquarters destroyed!".
     var pluralName: String {
         switch self {
         case .headquarters: return "headquarters"
@@ -55,14 +58,14 @@ extension Array where Element == Unit {
     /// Player-driven attacks (you hit the enemy):
     ///   `[.missile]`                          → "Enemy missile destroyed!"
     ///   `[.missile, .missile]`                → "2 enemy missiles destroyed!"
-    ///   `[.headquarters, .bomber, .missile]`  → "Enemy's headquarters, bomber and missile destroyed!"
+    ///   `[.headquarters, .bomber, .missile]`  → "Enemy's headquarter, bomber and missile destroyed!"
     ///   `[.missile, .missile, .bomber]`       → "2 enemy missiles and bomber destroyed!"
     ///   `[.bomber, .missile, .missile]`       → "Enemy bomber and 2 missiles destroyed!"
     ///
     /// Opponent-driven attacks (the AI hit you):
     ///   `[.missile]`                          → "Your missile is destroyed!"
     ///   `[.missile, .missile]`                → "Your 2 missiles are destroyed!"
-    ///   `[.headquarters, .bomber, .missile]`  → "Your headquarters, bomber and missile are destroyed!"
+    ///   `[.headquarters, .bomber, .missile]`  → "Your headquarter, bomber and missile are destroyed!"
     ///   `[.missile, .missile, .bomber]`       → "Your 2 missiles and bomber are destroyed!"
     ///
     /// Empty arrays return an empty string — callers should avoid queuing

@@ -38,6 +38,15 @@ struct OpponentSetupMapView: View {
                     }
                 }
                 .padding(.horizontal, BoardGridMetrics.horizontalPadding)
+                // Tiles must read as a static map, not as buttons. Disabling
+                // the underlying button (`isDisabled: true`) would dim the
+                // artwork — instead we keep `isDisabled: false` for full
+                // brightness and stop hit-testing the grid here so taps
+                // never reach a tile in the first place. The ScrollView's
+                // own pan gesture sits *outside* this `.allowsHitTesting`
+                // boundary so vertical scrolling continues to work, and the
+                // close button is a sibling overlay so it stays interactive.
+                .allowsHitTesting(false)
             }
             .scrollIndicators(.visible)
         }

@@ -16,6 +16,11 @@ enum GameReducer {
     /// Pause held after every non-HQ-killing attack so the player can absorb the
     /// just-rendered impact before the camera scrolls and the other side plays.
     private static let cooldownDuration: Double = 1.0
+    /// Extra hold added to `cooldownDuration` after a coastguard interception
+    /// so the player has more time to read the "shot down" banner before the
+    /// turn flips. Stacks on top of the regular cooldown — total interception
+    /// pause is `cooldownDuration + shotDownExtraCooldown` seconds.
+    private static let shotDownExtraCooldown: Double = 2.0
     /// Delay before the opponent makes its first move after the post-attack
     /// cooldown lifts. Generous enough for the auto-scroll animation to finish
     /// and the "Thinking…" banner to register before the first impact lands.
@@ -106,17 +111,46 @@ enum GameReducer {
             }
             return (s, [])
 
+        case .restartSetup:
+            // Player rejected their layout on the confirm screen — wipe every
+            // placed unit (and any setup-time scaffolding like the bomber's
+            // rotation map) and rewind to the very first placement step.
+            if case .setupConfirm = s.phase {
+                s.board.marks = [:]
+                s.board.bomberRotations = [:]
+                s.board.didApplyEnemySpawn = false
+                s.phase = .setup(.placeHeadquarter)
+                // Bring the camera back to the bottom so HQ placement begins
+                // with the same view the welcome → setup transition gives.
+                s.requestScroll(to: Zones.rowCount - 1, anchor: .bottom)
+            }
+            return (s, [])
+
+        case .confirmSetup:
+            // Player accepted their layout — spawn the AI's units, snapshot
+            // the board for the post-game map, and start the play phase. We
+            // mirror the original setup-completion logic from `handleSetupTap`,
+            // which used to fire automatically on coastguard placement.
+            if case .setupConfirm = s.phase {
+                EnemySpawner.apply(board: &s.board, rng: &rng)
+                s.boardAtPlayStart = s.board
+                s.phase = .play(.idle)
+                s.currentTurn = .player
+                s.requestScroll(to: Zones.opponentOverviewRow)
+            }
+            return (s, [])
+
         // MARK: Tap routing
 
         case .tap(let pos):
             switch s.mode {
-            case .destructionAlert, .victory, .defeat:
-                return (s, [])  // modal blocks input
+            case .destructionAlert, .victory, .defeat, .setupConfirm:
+                return (s, [])  // modal blocks input — setupConfirm uses its own buttons
             case .welcome:
                 s.phase = .setup(.placeHeadquarter)
                 return (s, [])
             case .setup(let step):
-                handleSetupTap(state: &s, step: step, pos: pos, rng: &rng)
+                handleSetupTap(state: &s, step: step, pos: pos)
                 return (s, [])
             case .play(let play):
                 // Cooldown locks the board between resolution and the turn flip.
@@ -133,11 +167,15 @@ enum GameReducer {
 
     // MARK: - Setup
 
-    private static func handleSetupTap<R: RandomNumberGenerator>(
+    /// Handles a placement tap during the `.setup(...)` phase. After the last
+    /// unit lands, we now park in `.setupConfirm` so the player gets a chance
+    /// to review and either commit (`Action.confirmSetup`) or restart from
+    /// scratch (`Action.restartSetup`). The AI spawn that used to fire here
+    /// has moved to the `confirmSetup` branch in `reduce`.
+    private static func handleSetupTap(
         state s: inout GameState,
         step: SetupStep,
-        pos: GridPosition,
-        rng: inout R
+        pos: GridPosition
     ) {
         guard step.isValidPlacement(pos.row) else { return }
         guard s.board.marks[pos] == nil else { return }
@@ -150,11 +188,7 @@ enum GameReducer {
                 s.requestScroll(to: Zones.coastguardPlayerRow)
             }
         } else {
-            EnemySpawner.apply(board: &s.board, rng: &rng)
-            s.boardAtPlayStart = s.board
-            s.phase = .play(.idle)
-            s.currentTurn = .player
-            s.requestScroll(to: Zones.opponentOverviewRow)
+            s.phase = .setupConfirm
         }
     }
 
@@ -170,8 +204,20 @@ enum GameReducer {
         case .idle, .shotDown:
             handleIdleTap(state: &s, pos: pos, effects: &effects)
         case .choosingBombTarget(let src):
+            // Tapping the highlighted launcher cancels the in-flight selection
+            // and returns to idle, so the player can pick a different bomber /
+            // missile (or fire a grenade instead) without being trapped on the
+            // first tile they tapped.
+            if pos == src {
+                s.phase = .play(.idle)
+                return
+            }
             handleConfirmBombTap(state: &s, source: src, pos: pos, effects: &effects)
         case .choosingMissileTarget(let src):
+            if pos == src {
+                s.phase = .play(.idle)
+                return
+            }
             handleConfirmMissileTap(state: &s, source: src, pos: pos, effects: &effects)
         case .bombingDrops:
             // Drops in flight; ignore taps.
@@ -281,7 +327,10 @@ enum GameReducer {
             s.phase = .play(.shotDown(.bomber, attacker: attacker))
             applyShotDownHighlight(state: &s, attacker: attacker, wreckPos: wreckPos)
             effects.append(.haptic(.notification))
-            startCooldown(state: &s, effects: &effects)
+            // Hold the shoot-down banner an extra `shotDownExtraCooldown`
+            // beats so the player can read "Bomber shot down by …" before
+            // the turn flips.
+            startCooldown(state: &s, effects: &effects, additionalSeconds: shotDownExtraCooldown)
             return
         }
 
@@ -428,7 +477,10 @@ enum GameReducer {
             s.phase = .play(.shotDown(.missile, attacker: attacker))
             applyShotDownHighlight(state: &s, attacker: attacker, wreckPos: wreckPos)
             effects.append(.haptic(.notification))
-            startCooldown(state: &s, effects: &effects)
+            // Hold the shoot-down banner an extra `shotDownExtraCooldown`
+            // beats so the player can read "Missile shot down by …" before
+            // the turn flips.
+            startCooldown(state: &s, effects: &effects, additionalSeconds: shotDownExtraCooldown)
             return
         }
 
@@ -536,9 +588,13 @@ enum GameReducer {
     /// the turn. Used after **every** bomb drop, the missile salvo, and grenade
     /// resolution — so the orange outline + explosion sticks for a full second
     /// before the next event.
-    private static func startCooldown(state s: inout GameState, effects: inout [SideEffect]) {
+    private static func startCooldown(
+        state s: inout GameState,
+        effects: inout [SideEffect],
+        additionalSeconds: Double = 0
+    ) {
         s.isInPostAttackCooldown = true
-        effects.append(.scheduleCompleteTurn(afterSeconds: cooldownDuration))
+        effects.append(.scheduleCompleteTurn(afterSeconds: cooldownDuration + additionalSeconds))
     }
 
     /// Flips `currentTurn` after the active side has fully resolved an attack.

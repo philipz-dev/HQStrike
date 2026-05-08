@@ -67,6 +67,15 @@ struct GameRootView: View {
                     )
                 }
 
+            case .setupConfirm:
+                // Live board stays visible underneath the floating buttons so
+                // the player can review their layout before locking it in.
+                PlayContainerView(snapshot: snapshot)
+                SetupConfirmOverlay(
+                    onRestart: { store.send(.restartSetup) },
+                    onConfirm: { store.send(.confirmSetup) }
+                )
+
             case .setup, .play:
                 PlayContainerView(snapshot: snapshot)
             }

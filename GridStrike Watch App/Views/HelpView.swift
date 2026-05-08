@@ -16,42 +16,67 @@ struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                goalCard
-                setupCard
-                combatCard
-                tacticsCard
+        VStack(spacing: 0) {
+            // Fixed header — sits above the ScrollView so it never moves
+            // when the manual scrolls. Light grey + black outline replaces
+            // the watchOS default green nav title, which the user found
+            // hard to read against the parchment / sheet chrome. The native
+            // `.navigationTitle` is intentionally *not* set so the system
+            // doesn't render its own green title above this one.
+            OutlinedText(
+                "How to play",
+                font: .headline.weight(.bold),
+                fill: Color(white: 0.85),
+                outline: .black,
+                outlineWidth: 1
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 4)
+            .background(Color.black)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    goalCard
+                    setupCard
+                    combatCard
+                    tacticsCard
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                // Inset the text away from the rolled top/bottom curls and the
+                // dark side shadows of the parchment scroll. The vertical pad is
+                // generous so the first and last lines never collide with the
+                // scroll caps even when the image stretches to fit long copy.
+                .padding(.horizontal, 18)
+                .padding(.top, 14)
+                .padding(.bottom, 44)
+                .font(.system(.body, design: .serif).italic())
+                .foregroundStyle(LetterPalette.ink)
+                .background {
+                    // Parchment stretches to match the natural content height —
+                    // the rolled scroll caps flex slightly with the text length,
+                    // which is acceptable on the watch and far simpler than the
+                    // 9-slice cap-inset variant.
+                    Assets.parchment
+                        .resizable()
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            // Inset the text away from the rolled top/bottom curls and the
-            // dark side shadows of the parchment scroll. The vertical pad is
-            // generous so the first and last lines never collide with the
-            // scroll caps even when the image stretches to fit long copy.
-            .padding(.horizontal, 18)
-            .padding(.top, 36)
-            .padding(.bottom, 44)
-            .font(.system(.body, design: .serif).italic())
-            .foregroundStyle(LetterPalette.ink)
-            .background {
-                // Parchment stretches to match the natural content height —
-                // the rolled scroll caps flex slightly with the text length,
-                // which is acceptable on the watch and far simpler than the
-                // 9-slice cap-inset variant.
-                Assets.parchment
-                    .resizable()
-            }
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
         // Outside the parchment we let the sheet sit on plain black so the
         // rolled edges of the scroll read against a void rather than the
         // system grey of the watchOS sheet chrome.
         .background(Color.black.ignoresSafeArea())
-        .navigationTitle("How to play")
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
+                // Solid sepia pill instead of the default translucent
+                // toolbar text — the user found the bare "Done" hard to
+                // pick out against the parchment-tinted nav bar. White
+                // foreground on `LetterPalette.ink` reads as a deliberate
+                // affordance rather than a label.
                 Button("Done") { dismiss() }
-                    .foregroundStyle(LetterPalette.ink)
+                    .buttonStyle(.borderedProminent)
+                    .tint(LetterPalette.ink)
+                    .foregroundStyle(.white)
             }
         }
     }
@@ -99,7 +124,7 @@ struct HelpView: View {
                 actionRow(
                     verb: "Bomber",
                     instruction: "Select bomber, then tile",
-                    damage: "3 tile damage"
+                    damage: "3 tile damage, starting at tapped tile"
                 )
             }
         }
@@ -110,6 +135,7 @@ struct HelpView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Coastguard defends against missiles and bombers.")
                 Text("Coastguards are vulnerable to grenades.")
+                Text("Tap a selected weapon again to deselect it.")
             }
             // Multi-line copy needs `fixedSize` so it expands vertically inside
             // the card instead of clipping at a single line.

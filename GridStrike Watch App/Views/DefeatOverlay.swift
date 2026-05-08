@@ -2,7 +2,10 @@
 //  DefeatOverlay.swift
 //  GridStrike Watch App
 //
-//  Shown when the opponent destroys the player's HQ — mirror of VictoryOverlay.
+//  Mirror of VictoryOverlay for the lose path. Uses `defeatBackground` as the
+//  full-bleed illustration and keeps the subtitle that explains *why* the
+//  game ended (the only end-game phrasing that isn't already obvious from
+//  the on-board explosion).
 //
 
 import SwiftUI
@@ -13,37 +16,66 @@ struct DefeatOverlay: View {
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.72)
+            // Solid underlay so the play container is fully obscured even if
+            // the image takes a frame to materialise — see VictoryOverlay
+            // for the matching rationale.
+            Color.black
                 .ignoresSafeArea()
-            VStack(spacing: 10) {
+
+            Assets.defeatBackground
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+                .ignoresSafeArea()
+
+            Color.black.opacity(0.30)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
                 Text("Defeat")
                     .font(.title2.weight(.bold))
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white)
                     .shadow(color: .black.opacity(0.9), radius: 5, y: 2)
-                Text("The enemy destroyed your headquarters.")
+                Text("The enemy destroyed your headquarter.")
                     .font(.footnote)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.white.opacity(0.85))
-                    .padding(.horizontal, 6)
-                Button(action: onNewGame) {
-                    Text("New game")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
+                    .shadow(color: .black.opacity(0.85), radius: 3, y: 1)
+                    .padding(.horizontal, 10)
+                    .padding(.top, 4)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+
+                // Same layout language as VictoryOverlay so the two end-game
+                // screens feel like a paired set; only the primary tint
+                // changes. Muted reds / greys keep the buttons obviously
+                // tappable without out-shouting the artwork.
+                HStack(spacing: 8) {
+                    Button(action: onNewGame) {
+                        Text("New")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(EndGamePalette.mutedRed)
+
+                    Button(action: onShowMap) {
+                        Text("Map")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(EndGamePalette.mutedGray)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
                 .padding(.horizontal, 8)
-                Button(action: onShowMap) {
-                    Text("Map")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .tint(.white)
-                .padding(.horizontal, 8)
+                // Generous bottom inset — see the matching note in
+                // VictoryOverlay; keeps the pills above the curved bezel.
+                .padding(.bottom, 14)
             }
-            .padding(16)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .allowsHitTesting(true)
     }

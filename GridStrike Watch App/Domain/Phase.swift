@@ -73,6 +73,11 @@ enum PlayState: Equatable {
 enum Phase: Equatable {
     case welcome
     case setup(SetupStep)
+    /// Player has just placed their last unit and is being asked to confirm the
+    /// layout. Two buttons (red ✗ / green ✓) sit on top of the live board so
+    /// the player can either restart placement from scratch or commit to the
+    /// current setup, at which point the AI's units are spawned and play begins.
+    case setupConfirm
     case play(PlayState)
     /// Terminal: the player hit the opponent's HQ. Only `.newGame` exits this state.
     case victory
@@ -83,10 +88,13 @@ enum Phase: Equatable {
 extension Phase {
     /// True for `.play`, `.victory` and `.defeat` — visually treated as "in-game"
     /// (board renders strikes, hides enemy art, etc.) even when the end-game modal is up.
+    /// `.setupConfirm` is *not* in-game: the AI hasn't been spawned yet, so we
+    /// keep the board rendered like late setup (player units shown, north grass
+    /// empty) instead of switching to the play-time fog mask.
     var isInGame: Bool {
         switch self {
         case .play, .victory, .defeat: return true
-        case .welcome, .setup: return false
+        case .welcome, .setup, .setupConfirm: return false
         }
     }
 

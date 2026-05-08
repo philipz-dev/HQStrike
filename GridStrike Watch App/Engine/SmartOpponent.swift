@@ -33,6 +33,14 @@ struct SmartOpponent: OpponentPolicy {
     /// predictable about the corners while still treating them as exceptions.
     private static let cornerMissileLapseProbability: Double = 0.05
 
+    /// Most recent row-8 grenade column the AI has played. Read by the next
+    /// bomber / missile target picker so the follow-up launch reuses the
+    /// column we just probed: a HIT cleared the coastguard there, a MISS
+    /// confirmed the column is interception-free either way. Cleared once
+    /// the value is consumed by a target pick so the bias only nudges the
+    /// next launch, not every launch forever.
+    private var preferredLaunchCol: Int?
+
     init() {}
 
     mutating func nextAction(given state: GameState) -> Action? {
@@ -42,16 +50,30 @@ struct SmartOpponent: OpponentPolicy {
 
         let belief = computeBelief(state: state)
 
+        let result: Action?
         switch play {
         case .idle, .shotDown:
-            return pickWeaponLaunch(state: state, belief: belief)
+            result = pickWeaponLaunch(state: state, belief: belief)
         case .choosingBombTarget:
-            return pickBomberTarget(state: state, belief: belief)
+            result = pickBomberTarget(state: state, belief: belief)
         case .choosingMissileTarget:
-            return pickMissileTarget(state: state, belief: belief)
+            result = pickMissileTarget(state: state, belief: belief)
         case .bombingDrops:
-            return nil      // wait for the scheduled advance-bomb-drop tick
+            result = nil       // wait for the scheduled advance-bomb-drop tick
         }
+
+        // Save the column whenever we just emitted a row-8 grenade probe so
+        // the follow-up launch on a later turn can target the same column.
+        // Launcher taps (north grass, rows 0–4) and target taps (south grass,
+        // rows 9–13) never satisfy this row check, so it only fires for
+        // probes.
+        if let action = result,
+           case .tap(let pos) = action,
+           pos.row == Zones.coastguardPlayerRow {
+            preferredLaunchCol = pos.col
+        }
+
+        return result
     }
 
     // MARK: - Belief
@@ -143,15 +165,26 @@ struct SmartOpponent: OpponentPolicy {
         let bombers = ownUnits(state: state, of: .bomber)
         let missiles = ownUnits(state: state, of: .missile)
         let canLaunch = !bombers.isEmpty || !missiles.isEmpty
+
+        // No launchers left → the player's coastguard can't intercept anything
+        // anymore, so probing row 8 only burns turns. Skip the SCOUT/PRESS
+        // launch tracks entirely and hunt the HQ in the player's grass instead.
+        if !canLaunch {
+            return huntAction(state: state, belief: belief)
+        }
+
         let cgResolved = belief.cgConfirmedDestroyed || belief.cgKnownColumn != nil
         let safeCols = belief.safeCols
-        let hasSafeLaunch = canLaunch && hasViableLaunch(bombers: bombers, missiles: missiles, safeCols: safeCols)
+        let hasSafeLaunch = hasViableLaunch(bombers: bombers, missiles: missiles, safeCols: safeCols)
 
         // SCOUT phase — CG status unresolved and there are still row-8 cells to probe.
         if !cgResolved, !belief.unprobedRow8Cols.isEmpty {
-            // ~30% of the time, take a "safe" launch first if the AI has already
-            // confirmed at least one clear column — otherwise probe.
-            if hasSafeLaunch, Double.random(in: 0..<1) < 0.30 {
+            // ~65% of the time, take a "safe" launch first if the AI has already
+            // confirmed at least one clear column — otherwise probe. The earlier
+            // bias used to be 30%, but we now favour deploying launchers as soon
+            // as a safe column is known so they aren't sitting ducks for the
+            // player's grenades for half the game.
+            if hasSafeLaunch, Double.random(in: 0..<1) < 0.65 {
                 if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: safeCols) {
                     return action
                 }
@@ -164,7 +197,7 @@ struct SmartOpponent: OpponentPolicy {
         // PRESS phase — CG resolved (destroyed or column pinned down) or row 8
         // already fully probed. Mostly launch into safe columns.
         let launchCols = safeCols.isEmpty ? Array(Zones.allColumns) : safeCols
-        if canLaunch, Double.random(in: 0..<1) < 0.85 {
+        if Double.random(in: 0..<1) < 0.85 {
             if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: launchCols) {
                 return action
             }
@@ -216,18 +249,23 @@ struct SmartOpponent: OpponentPolicy {
     /// hits when better options exist.
     private func missilesAreLaunchable(safeCols: [Int]) -> Bool {
         if safeCols.contains(where: { Self.wideMissileColumns.contains($0) }) { return true }
-        let corners = safeCols.filter { Zones.missileTargetColumns.contains($0) }
+        let corners = safeCols.filter { Zones.missileCornerColumns.contains($0) }
         if !corners.isEmpty, Double.random(in: 0..<1) < Self.cornerMissileLapseProbability {
             return true
         }
         return false
     }
 
-    /// Random un-grenaded cell on the player's grass (rows 9–13). Biased toward
+    /// Random un-attacked cell on the player's grass (rows 9–13). Biased toward
     /// safe columns: those are where the player's HQ / launchers are likeliest
     /// to be parked since they cluster off the coastguard column.
+    ///
+    /// "Un-attacked" here means no grenade strike, bombing overlay, or missile
+    /// overlay has ever landed on the cell, regardless of hit/miss. Re-targeting
+    /// any of those wastes the grenade — it can't reveal new info or do new
+    /// damage on a cell whose contents we've already resolved.
     private func huntAction(state: GameState, belief: Belief) -> Action? {
-        let strikes = state.grenadeStrikes[.player]
+        let attacked = attackedCellsAgainstPlayer(state: state)
         let safeColSet = Set(belief.safeCols)
 
         var preferred: [GridPosition] = []
@@ -235,7 +273,7 @@ struct SmartOpponent: OpponentPolicy {
         for row in Zones.southGrass {
             for col in Zones.allColumns {
                 let p = GridPosition(row, col)
-                if strikes[p] != nil { continue }
+                if attacked.contains(p) { continue }
                 if !safeColSet.isEmpty, safeColSet.contains(col) {
                     preferred.append(p)
                 } else {
@@ -249,15 +287,46 @@ struct SmartOpponent: OpponentPolicy {
 
     // MARK: - Targeting
 
-    private func pickBomberTarget(state: GameState, belief: Belief) -> Action? {
+    private mutating func pickBomberTarget(state: GameState, belief: Belief) -> Action? {
         let safeCols = belief.safeCols
-        let bombed = Set(state.bombingOverlays[.player].keys)
+        let attacked = attackedCellsAgainstPlayer(state: state)
 
-        // Best: a safe column with at least one un-bombed cell.
-        if let pick = bombingTargets(cols: safeCols, exclude: bombed).randomElement() {
+        // Follow up the most recent row-8 grenade with a strike on the same
+        // column. Bombers deliver all three drops as long as the anchor row
+        // sits inside `safeBombingTargetRows`, so honouring the preferred col
+        // here never costs the salvo any cells.
+        if let preferred = preferredLaunchCol, safeCols.contains(preferred) {
+            preferredLaunchCol = nil
+            // Best on the preferred col: anchor and entire 3-drop column avoid
+            // every previously attacked cell.
+            if let pick = bombingTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true).randomElement() {
+                return .tap(pick)
+            }
+            // Acceptable: anchor itself isn't on a previously attacked cell.
+            if let pick = bombingTargets(cols: [preferred], exclude: attacked).randomElement() {
+                return .tap(pick)
+            }
+            // Tolerable: use the preferred col even with full overlap so we
+            // honour the row-8 follow-up rule; better an overlap on the right
+            // column than walking off it entirely.
+            if let pick = bombingTargets(cols: [preferred], exclude: []).randomElement() {
+                return .tap(pick)
+            }
+            // Preferred col yielded nothing — fall through to the general
+            // safety heuristics below.
+        } else {
+            preferredLaunchCol = nil
+        }
+
+        // Best: a safe col where the anchor and every drop avoid prior attacks.
+        if let pick = bombingTargets(cols: safeCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
             return .tap(pick)
         }
-        // Acceptable: a safe column even if every cell was already bombed.
+        // Acceptable: a safe col with at least an un-attacked anchor.
+        if let pick = bombingTargets(cols: safeCols, exclude: attacked).randomElement() {
+            return .tap(pick)
+        }
+        // Tolerable: a safe col even with full overlap.
         if let pick = bombingTargets(cols: safeCols, exclude: []).randomElement() {
             return .tap(pick)
         }
@@ -265,22 +334,50 @@ struct SmartOpponent: OpponentPolicy {
         return bombingTargets(cols: Array(Zones.allColumns), exclude: []).randomElement().map { .tap($0) }
     }
 
-    private func pickMissileTarget(state: GameState, belief: Belief) -> Action? {
-        let safeWide = belief.safeCols.filter { Self.wideMissileColumns.contains($0) }
-        let safeCornerCols = belief.safeCols.filter {
-            Zones.missileTargetColumns.contains($0) && !Self.wideMissileColumns.contains($0)
-        }
-        let struck = Set(state.missileOverlays[.player].keys)
+    private mutating func pickMissileTarget(state: GameState, belief: Belief) -> Action? {
+        let attacked = attackedCellsAgainstPlayer(state: state)
 
-        // Best: a wide (5-cell) safe column.
-        if let pick = missileTargets(cols: safeWide, exclude: struck).randomElement() {
+        // Same row-8 follow-up rule for missiles. Anchoring in a corner column
+        // (0 or 4) wastes 2 of 5 cells, but the user-facing rule "strike where
+        // you just probed" wins over that micro-optimisation — the AI was
+        // willing to probe the column, so it's willing to spend its salvo on
+        // the same column too.
+        if let preferred = preferredLaunchCol, belief.safeCols.contains(preferred) {
+            preferredLaunchCol = nil
+            if let pick = missileTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true).randomElement() {
+                return .tap(pick)
+            }
+            if let pick = missileTargets(cols: [preferred], exclude: attacked).randomElement() {
+                return .tap(pick)
+            }
+            if let pick = missileTargets(cols: [preferred], exclude: []).randomElement() {
+                return .tap(pick)
+            }
+        } else {
+            preferredLaunchCol = nil
+        }
+
+        let safeWide = belief.safeCols.filter { Self.wideMissileColumns.contains($0) }
+        let safeCornerCols = belief.safeCols.filter { Zones.missileCornerColumns.contains($0) }
+
+        // Best: wide (5-cell) safe col, X-pattern entirely on un-attacked cells.
+        if let pick = missileTargets(cols: safeWide, exclude: attacked, avoidFootprintHits: true).randomElement() {
             return .tap(pick)
         }
+        // Acceptable: wide safe col with un-attacked anchor.
+        if let pick = missileTargets(cols: safeWide, exclude: attacked).randomElement() {
+            return .tap(pick)
+        }
+        // Tolerable: wide safe col, any anchor.
         if let pick = missileTargets(cols: safeWide, exclude: []).randomElement() {
             return .tap(pick)
         }
-        // Exception: settle for a corner column only when wide cols are unavailable.
-        if let pick = missileTargets(cols: safeCornerCols, exclude: struck).randomElement() {
+        // Settle for corner cols only when wide cols are unavailable, keeping
+        // the same overlap-avoidance ladder.
+        if let pick = missileTargets(cols: safeCornerCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
+            return .tap(pick)
+        }
+        if let pick = missileTargets(cols: safeCornerCols, exclude: attacked).randomElement() {
             return .tap(pick)
         }
         if let pick = missileTargets(cols: safeCornerCols, exclude: []).randomElement() {
@@ -296,27 +393,64 @@ struct SmartOpponent: OpponentPolicy {
         return missileTargets(cols: anyCols, exclude: []).randomElement().map { .tap($0) }
     }
 
-    private func bombingTargets(cols: [Int], exclude: Set<GridPosition>) -> [GridPosition] {
+    /// Bomber anchor candidates. `exclude` removes the anchor cells themselves
+    /// from the pool; `avoidFootprintHits` additionally drops any anchor whose
+    /// 3-drop column intersects the exclude set, so the salvo never lands a
+    /// drop on a cell that has already been resolved.
+    private func bombingTargets(
+        cols: [Int],
+        exclude: Set<GridPosition>,
+        avoidFootprintHits: Bool = false
+    ) -> [GridPosition] {
         var result: [GridPosition] = []
         // Use the safe (all-3-drops-land) range — the AI never benefits from
         // walking drops off the back of the board even though it's now legal.
         for row in Zones.safeBombingTargetRows(attacker: .opponent) {
             for col in cols {
                 let p = GridPosition(row, col)
-                if !exclude.contains(p) { result.append(p) }
+                if exclude.contains(p) { continue }
+                if avoidFootprintHits {
+                    let footprint = Rules.bombingPositions(target: p, attacker: .opponent)
+                    if footprint.contains(where: { exclude.contains($0) }) { continue }
+                }
+                result.append(p)
             }
         }
         return result
     }
 
-    private func missileTargets(cols: [Int], exclude: Set<GridPosition>) -> [GridPosition] {
+    /// Missile anchor candidates. Same `exclude` / `avoidFootprintHits` contract
+    /// as `bombingTargets`, but the footprint check uses the X-pattern instead
+    /// of the 3-drop column.
+    private func missileTargets(
+        cols: [Int],
+        exclude: Set<GridPosition>,
+        avoidFootprintHits: Bool = false
+    ) -> [GridPosition] {
         var result: [GridPosition] = []
         for row in Zones.missileTargetRows(attacker: .opponent) {
             for col in cols {
                 let p = GridPosition(row, col)
-                if !exclude.contains(p) { result.append(p) }
+                if exclude.contains(p) { continue }
+                if avoidFootprintHits {
+                    let footprint = Rules.missilePositions(anchor: p, attacker: .opponent)
+                    if footprint.contains(where: { exclude.contains($0) }) { continue }
+                }
+                result.append(p)
             }
         }
+        return result
+    }
+
+    /// Every cell on the player's half that the AI has already resolved with
+    /// any kind of strike — grenade, bomb, or missile — regardless of whether
+    /// it landed as a hit or a miss. Used to keep the AI from re-targeting
+    /// tiles whose contents are already known.
+    private func attackedCellsAgainstPlayer(state: GameState) -> Set<GridPosition> {
+        var result: Set<GridPosition> = []
+        result.formUnion(state.grenadeStrikes[.player].keys)
+        result.formUnion(state.bombingOverlays[.player].keys)
+        result.formUnion(state.missileOverlays[.player].keys)
         return result
     }
 

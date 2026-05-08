@@ -38,7 +38,7 @@ struct BoardSnapshot: Equatable {
             case .destructionAlert(let alert): return .destructionAlert(alert)
             case .victory: return .victory
             case .defeat: return .defeat
-            case .welcome, .setup, .play: return nil
+            case .welcome, .setup, .setupConfirm, .play: return nil
             }
         }()
 
@@ -230,7 +230,10 @@ struct BoardSnapshot: Equatable {
             if pos == src { return .none }
             return Zones.isMissileTarget(pos) ? .none : .normal
 
-        case .play, .victory, .defeat:
+        case .play, .victory, .defeat, .setupConfirm:
+            // setupConfirm renders the player's finished layout at full
+            // brightness — the floating confirm/restart buttons are the only
+            // affordance, so no tile dimming is needed.
             return .none
 
         case .setup(.placeCoastguard):
@@ -261,7 +264,9 @@ struct BoardSnapshot: Equatable {
         if state.pendingOpponentImpact != nil { return true }
 
         switch state.phase {
-        case .welcome, .victory, .defeat:
+        case .welcome, .victory, .defeat, .setupConfirm:
+            // `.setupConfirm` is already covered by the `isModalActive`
+            // early-return above; listed here so the switch stays exhaustive.
             return false
         case .setup(let step):
             if mark != nil { return false }

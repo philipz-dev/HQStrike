@@ -47,7 +47,9 @@ enum BannerKind: Equatable {
 extension GameState {
     var banner: BannerKind {
         switch mode {
-        case .destructionAlert, .victory, .defeat, .welcome:
+        case .destructionAlert, .victory, .defeat, .welcome, .setupConfirm:
+            // `.setupConfirm` mutes the banner so the floating confirm buttons
+            // are the only thing competing with the board for attention.
             return .none
         case .setup(let step):
             return .place(step)

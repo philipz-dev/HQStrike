@@ -25,6 +25,14 @@ enum Assets {
     static let planeInWater = Image("PlaneInWater")
     static let missileInWater = Image("MissileInWater")
     static let splashBackground = Image("SplashBackground")
+    /// Full-bleed art shown behind the Victory overlay — celebratory soldier
+    /// silhouette painted to read against the dark scrim that hosts the
+    /// "Victory!" label and the New game / Map buttons.
+    static let victoryBackground = Image("VictoryBackground")
+    /// Mirror of `victoryBackground` for the defeat path. Same composition
+    /// language (single soldier, sunset sky) so the two end-game screens
+    /// feel like a paired set.
+    static let defeatBackground = Image("DefeatBackground")
     /// Aged parchment scroll used as the backdrop for the help/instructions
     /// sheet. Resized vertically to fit whatever text length the help page
     /// produces; horizontally clipped to the watch width.

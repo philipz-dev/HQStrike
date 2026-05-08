@@ -18,7 +18,11 @@ struct DestructionAlertOverlay: View {
         ZStack {
             Color.black.opacity(0.72)
                 .ignoresSafeArea()
-            VStack(spacing: 10) {
+            // VStack fills the screen so the explicit Spacer below can push
+            // the OK button toward the bottom edge instead of letting it ride
+            // up against the message — multi-line destruction texts used to
+            // hug the button so closely it visually clipped the last line.
+            VStack(spacing: 0) {
                 // ScrollView guarantees the full message is reachable even on
                 // the smallest watch face — `.body` already fits the longest
                 // expected sentence (~5 destroyed units), but a noisy
@@ -39,16 +43,25 @@ struct DestructionAlertOverlay: View {
                         .shadow(color: .black.opacity(0.9), radius: 4, y: 2)
                         .frame(maxWidth: .infinity)
                 }
+
+                // Explicit gap between the message and the button — `minLength`
+                // is the breathing-room minimum, the rest is consumed by the
+                // VStack expanding to fill the screen.
+                Spacer(minLength: 16)
+
                 // Compact OK pill — natural-width, footnote-sized — so the
-                // button never crowds the message.
+                // button never crowds the message. Bottom padding pulls it
+                // off the curved watch bezel.
                 Button("OK", action: onDismiss)
                     .font(.footnote.weight(.semibold))
                     .buttonStyle(.borderedProminent)
                     .tint(.blue)
                     .controlSize(.small)
+                    .padding(.bottom, 6)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 14)
+            .padding(.top, 14)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .allowsHitTesting(true)
     }

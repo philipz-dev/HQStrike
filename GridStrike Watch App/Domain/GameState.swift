@@ -93,7 +93,7 @@ struct GameState: Equatable {
     /// Each entry knows the attacker side (so the modal text can switch
     /// between "Enemy …" and "Your …" framing) and lists every unit
     /// destroyed by that single attack so the UI can show one consolidated
-    /// modal ("2 enemy missiles destroyed!" / "Your headquarters, bomber and
+    /// modal ("2 enemy missiles destroyed!" / "Your headquarter, bomber and
     /// missile are destroyed!") rather than spamming a modal per cell. Bomb
     /// sequences accumulate into `inFlightBombDestructions` across drops 1–3,
     /// then push a single entry when the salvo finalises.
@@ -183,6 +183,9 @@ struct GameState: Equatable {
 enum UIMode: Equatable {
     case welcome
     case setup(SetupStep)
+    /// Last setup placement is in. The player is reviewing their layout with
+    /// the two transparent confirm buttons floating over the live board.
+    case setupConfirm
     case play(PlayState)
     /// One destruction modal per resolved attack; carries the attacker side
     /// plus every unit the attack destroyed so the overlay can render a
@@ -210,6 +213,7 @@ extension GameState {
         switch phase {
         case .welcome: return .welcome
         case .setup(let step): return .setup(step)
+        case .setupConfirm: return .setupConfirm
         case .play(let play): return .play(play)
         case .victory: return .victory
         case .defeat: return .defeat
@@ -218,9 +222,11 @@ extension GameState {
 
     /// Convenience derived from `mode`. The grid does not respond to taps in any
     /// modal state. Replaces the previous `victory || !queue.isEmpty` pair.
+    /// `.setupConfirm` counts as modal so the underlying tiles can't be tapped
+    /// while the confirm/restart buttons are floating over the board.
     var isModalActive: Bool {
         switch mode {
-        case .destructionAlert, .victory, .defeat: return true
+        case .destructionAlert, .victory, .defeat, .setupConfirm: return true
         case .welcome, .setup, .play: return false
         }
     }
