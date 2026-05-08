@@ -25,7 +25,7 @@
         }
 
         header {
-            padding: 60px 20px;
+            padding: 80px 20px 60px 20px;
             text-align: center;
             max-width: 800px;
         }
@@ -35,30 +35,20 @@
             height: 120px;
             border-radius: 24%;
             margin-bottom: 20px;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
-        }
-
-        .status-badge {
-            background-color: #ff9500;
-            color: #000;
-            padding: 6px 16px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: bold;
-            margin-bottom: 20px;
-            display: inline-block;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
         }
 
         h1 {
-            font-size: 3rem;
+            font-size: 3.5rem;
             margin: 10px 0;
             letter-spacing: -1px;
+            font-weight: 800;
         }
 
         .tagline {
             font-size: 1.5rem;
             color: var(--text-dim);
-            margin-bottom: 40px;
+            margin-bottom: 0;
         }
 
         .container {
@@ -81,6 +71,7 @@
         .feature-box h3 {
             color: var(--apple-red);
             margin-bottom: 10px;
+            font-size: 1.2rem;
         }
 
         .screenshots-scroll {
@@ -89,29 +80,27 @@
             gap: 20px;
             padding: 20px 0;
             width: 100%;
-            scrollbar-width: none; /* Firefox */
+            scrollbar-width: none;
         }
-        .screenshots-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+        .screenshots-scroll::-webkit-scrollbar { display: none; }
 
         .screenshot-item {
             flex: 0 0 auto;
             width: 220px;
             height: 270px;
-            background-color: #333;
-            border-radius: 30px;
+            background-color: #000;
+            border-radius: 35px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 2px solid #444;
-            color: #555;
-            font-weight: bold;
+            border: 1px solid #333;
         }
 
         .screenshot-item img {
             width: 100%;
             height: 100%;
             object-fit: cover;
-            border-radius: 28px;
+            border-radius: 34px;
         }
 
         .legal-section {
@@ -121,49 +110,51 @@
             padding-top: 40px;
         }
 
+        h2 { font-size: 1.8rem; margin-bottom: 30px; }
+
         a { color: var(--apple-blue); text-decoration: none; }
         a:hover { text-decoration: underline; }
 
         footer {
-            padding: 40px;
+            padding: 60px 40px;
             color: var(--text-dim);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
     <header>
-        <div class="status-badge">COMING SOON TO watchOS</div>
         <img src="GridStrike_appicon.png" alt="GridStrike Icon" class="app-icon">
         <h1>GridStrike</h1>
-        <p class="tagline">Tactical warfare. Designed for the wrist.</p>
+        <p class="tagline">Tactical strategy for Apple Watch.</p>
     </header>
 
     <section class="container">
         <h2>The Experience</h2>
         <div class="features">
             <div class="feature-box">
-                <h3>Turn-Based Strategy</h3>
-                <p>Command your fleet in a calculated battle of wits. Every move counts in this optimized grid-based combat system.</p>
+                <h3>Calculated Combat</h3>
+                <p>Command your fleet in a battle of wits. Every move counts in this optimized grid-based combat system.</p>
             </div>
             <div class="feature-box">
-                <h3>SmartOpponent AI</h3>
-                <p>Face an adaptive AI that hunts, probes, and strikes back. No two games are the same.</p>
+                <h3>Adaptive AI</h3>
+                <p>Face an opponent that hunts, probes, and strikes back. The SmartOpponent ensures no two games are the same.</p>
             </div>
             <div class="feature-box">
                 <h3>Haptic Feedback</h3>
                 <p>Feel the tension. High-definition haptics bring every missile launch and impact directly to your wrist.</p>
             </div>
             <div class="feature-box">
-                <h3>Stand-alone Play</h3>
-                <p>Zero iPhone dependency. Play fully on your Apple Watch, anytime, anywhere.</p>
+                <h3>Truly Independent</h3>
+                <p>Zero iPhone dependency. Experience the full depth of GridStrike standalone on your watchOS device.</p>
             </div>
         </div>
     </section>
 
     <section class="container">
-        <h2>Screenshots</h2>
+        <h2>Visuals</h2>
         <div class="screenshots-scroll">
             <div class="screenshot-item"><img src="shot1.png" alt="Setup Phase"></div>
             <div class="screenshot-item"><img src="shot2.png" alt="Grid View"></div>
@@ -171,28 +162,28 @@
             <div class="screenshot-item"><img src="shot4.png" alt="Victory Screen"></div>
             <div class="screenshot-item"><img src="shot5.png" alt="Settings"></div>
         </div>
-        <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 10px;">&larr; Scroll to view more &rarr;</p>
+        <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 15px; text-align: center;">&larr; Swipe to view &rarr;</p>
     </section>
 
     <section class="container legal-section">
         <div id="support">
             <h3>Support & Contact</h3>
-            <p>Need help or have suggestions? Reach out to us at: <a href="mailto:philip.zvar@gmail.com">philip.zvar@gmail.com</a></p>
+            <p>For questions, feedback, or support, reach out to us at: <a href="mailto:philip.zvar@gmail.com">philip.zvar@gmail.com</a></p>
         </div>
 
-        <div id="privacy" style="margin-top: 30px;">
+        <div id="privacy" style="margin-top: 40px;">
             <h3>Privacy Policy</h3>
-            <p><strong>GridStrike</strong> respects your privacy. Our policy is simple:</p>
+            <p><strong>GridStrike</strong> is built with privacy in mind:</p>
             <ul>
-                <li><strong>No Data Collection:</strong> We do not collect, store, or share any personal information.</li>
-                <li><strong>Local Storage:</strong> All game progress and settings are stored exclusively on your local device.</li>
-                <li><strong>No Tracking:</strong> There are no third-party trackers or analytics embedded in the app.</li>
+                <li><strong>No Collection:</strong> We do not collect or store any personal user data.</li>
+                <li><strong>Local Storage:</strong> Game progress and settings are kept strictly on your local device.</li>
+                <li><strong>No Tracking:</strong> There are no third-party trackers or ads in the app.</li>
             </ul>
         </div>
     </section>
 
     <footer>
-        &copy; 2026 Philipz Software. Built for Apple Watch.
+        &copy; 2026 Philipz Software. All rights reserved.<br>Made for watchOS.
     </footer>
 
 </body>
