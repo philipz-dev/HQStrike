@@ -3,100 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GridStrike | Tactical War Strategy for Apple Watch</title>
+    <title>GridStrike | Tactical War Strategy</title>
     <style>
-        :root {
-            --apple-red: #ff3b30;
-            --apple-blue: #007aff;
-            --bg-dark: #0a0a0a;
-            --container-bg: #161617;
-            --text-main: #eeeeee;
-            --text-dim: #86868b;
-        }
+        :root { --apple-red: #ff3b30; --apple-blue: #007aff; --bg-dark: #0a0a0a; --container-bg: #161617; --text-main: #eeeeee; --text-dim: #86868b; }
+        body { background-color: var(--bg-dark); color: var(--text-main); font-family: -apple-system, system-ui, sans-serif; margin: 0; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        header { padding: 60px 20px; text-align: center; }
+        .app-icon { width: 100px; height: 100px; border-radius: 22px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { font-size: 2.5rem; margin: 0; font-weight: 800; }
+        .tagline { font-size: 1.2rem; color: var(--text-dim); margin: 10px 0 0 0; }
+        .container { max-width: 800px; width: 90%; background: var(--container-bg); border-radius: 24px; padding: 30px; margin-bottom: 30px; box-sizing: border-box; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: left; }
+        .feature-box h3 { color: var(--apple-red); margin-top: 0; font-size: 1.1rem; }
+        .screenshots-scroll { display: flex; overflow-x: auto; gap: 15px; padding-bottom: 15px; width: 100%; scrollbar-width: thin; scrollbar-color: #333 transparent; }
+        .screenshot-item { flex: 0 0 auto; width: 180px; height: 220px; background: #000; border-radius: 28px; border: 1px solid #333; display: flex; align-items: center; justify-content: center; }
+        .screenshot-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 26px; }
+        a { color: var(--apple-blue); text-decoration: none; }
+        footer { padding: 40px; color: var(--text-dim); font-size: 0.8rem; text-align: center; }
+    </style>
+</head>
+<body>
 
-        body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+    <header>
+        <img src="GridStrike_appicon.png" alt="Icon" class="app-icon">
+        <h1>GridStrike</h1>
+        <p class="tagline">Tactical war strategy game for Apple Watch.</p>
+    </header>
 
-        header {
-            padding: 80px 20px 60px 20px;
-            text-align: center;
-            max-width: 800px;
-        }
+    <div class="container">
+        <div class="features">
+            <div class="feature-box">
+                <h3>Tactical Warfare</h3>
+                <p>Command your fleet and conquer the enemy in a precision grid-based combat system.</p>
+            </div>
+            <div class="feature-box">
+                <h3>Adaptive AI</h3>
+                <p>Face the SmartOpponent—an AI that hunts and strikes back in every match.</p>
+            </div>
+        </div>
+    </div>
 
-        .app-icon {
-            width: 120px;
-            height: 120px;
-            border-radius: 24%;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
-        }
+    <div class="container">
+        <h2 style="margin-top:0">Visuals</h2>
+        <div class="screenshots-scroll">
+            <div class="screenshot-item"><img src="shot1.png" alt="Shot 1"></div>
+            <div class="screenshot-item"><img src="shot2.png" alt="Shot 2"></div>
+            <div class="screenshot-item"><img src="shot3.png" alt="Shot 3"></div>
+            <div class="screenshot-item"><img src="shot4.png" alt="Shot 4"></div>
+            <div class="screenshot-item"><img src="shot5.png" alt="Shot 5"></div>
+        </div>
+    </div>
 
-        h1 {
-            font-size: 3.5rem;
-            margin: 10px 0;
-            letter-spacing: -1px;
-            font-weight: 800;
-        }
+    <div class="container">
+        <h3>Support & Privacy</h3>
+        <p>Questions? <a href="mailto:philip.zvar@gmail.com">Contact Support</a></p>
+        <p style="font-size: 0.9rem; color: var(--text-dim);">Privacy: GridStrike collects no data. Everything stays on your watch.</p>
+    </div>
 
-        .tagline {
-            font-size: 1.5rem;
-            color: var(--text-dim);
-            margin-bottom: 0;
-        }
+    <footer>
+        &copy; 2026 Philipz Software. Made for watchOS.
+    </footer>
 
-        .container {
-            max-width: 900px;
-            width: 90%;
-            background-color: var(--container-bg);
-            border-radius: 30px;
-            padding: 40px;
-            margin-bottom: 40px;
-            box-sizing: border-box;
-        }
-
-        .features {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 30px;
-            text-align: left;
-        }
-
-        .feature-box h3 {
-            color: var(--apple-red);
-            margin-bottom: 10px;
-            font-size: 1.2rem;
-        }
-
-        /* SCREENSHOT SCROLL FIX */
-        .screenshots-scroll {
-            display: flex;
-            overflow-x: auto;
-            gap: 20px;
-            padding: 20px 0;
-            width: 100%;
-            scrollbar-width: thin;
-            scrollbar-color: #333 #1a1a1a;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .screenshots-scroll::-webkit-scrollbar {
-            height: 8px;
-            display: block;
-        }
-
-        .screenshots-scroll::-webkit-scrollbar-track {
-            background: #1a1a1a;
-            border-radius: 10px;
-        }
-
-        .screenshots-scroll::-webkit-scrollbar-thumb {
-            background: #333;
-            border-radius: 10px;
-        }
+</body>
+</html>
