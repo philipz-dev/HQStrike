@@ -74,117 +74,29 @@
             font-size: 1.2rem;
         }
 
+        /* SCREENSHOT SCROLL FIX */
         .screenshots-scroll {
             display: flex;
             overflow-x: auto;
             gap: 20px;
             padding: 20px 0;
             width: 100%;
-            scrollbar-width: none;
-        }
-        .screenshots-scroll::-webkit-scrollbar { display: none; }
-
-        .screenshot-item {
-            flex: 0 0 auto;
-            width: 220px;
-            height: 270px;
-            background-color: #000;
-            border-radius: 35px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid #333;
+            scrollbar-width: thin;
+            scrollbar-color: #333 #1a1a1a;
+            -webkit-overflow-scrolling: touch;
         }
 
-        .screenshot-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 34px;
+        .screenshots-scroll::-webkit-scrollbar {
+            height: 8px;
+            display: block;
         }
 
-        .legal-section {
-            text-align: left;
-            border-top: 1px solid #333;
-            margin-top: 40px;
-            padding-top: 40px;
+        .screenshots-scroll::-webkit-scrollbar-track {
+            background: #1a1a1a;
+            border-radius: 10px;
         }
 
-        h2 { font-size: 1.8rem; margin-bottom: 30px; }
-
-        a { color: var(--apple-blue); text-decoration: none; }
-        a:hover { text-decoration: underline; }
-
-        footer {
-            padding: 60px 40px;
-            color: var(--text-dim);
-            font-size: 0.85rem;
-            text-align: center;
+        .screenshots-scroll::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 10px;
         }
-    </style>
-</head>
-<body>
-
-    <header>
-        <img src="GridStrike_appicon.png" alt="GridStrike Icon" class="app-icon">
-        <h1>GridStrike</h1>
-        <p class="tagline">Tactical war strategy game for Apple Watch.</p>
-    </header>
-
-    <section class="container">
-        <h2>The Experience</h2>
-        <div class="features">
-            <div class="feature-box">
-                <h3>Immersive Tactical Warfare</h3>
-                <p>Command your fleet and conquer the enemy. Every move counts in this precision grid-based combat system.</p>
-            </div>
-            <div class="feature-box">
-                <h3>Adaptive AI</h3>
-                <p>Face an opponent that hunts, probes, and strikes back. The SmartOpponent ensures no two games are the same.</p>
-            </div>
-            <div class="feature-box">
-                <h3>Haptic Feedback</h3>
-                <p>Feel the tension. High-definition haptics bring every missile launch and impact directly to your wrist.</p>
-            </div>
-            <div class="feature-box">
-                <h3>Designed for Apple Watch</h3>
-                <p>Experience the full depth of GridStrike on your wrist! Designed specifically for the unique watchOS interface.</p>
-            </div>
-        </div>
-    </section>
-
-    <section class="container">
-        <h2>Visuals</h2>
-        <div class="screenshots-scroll">
-            <div class="screenshot-item"><img src="shot1.png" alt="Setup Phase"></div>
-            <div class="screenshot-item"><img src="shot2.png" alt="Grid View"></div>
-            <div class="screenshot-item"><img src="shot3.png" alt="Combat Action"></div>
-            <div class="screenshot-item"><img src="shot4.png" alt="Victory Screen"></div>
-            <div class="screenshot-item"><img src="shot5.png" alt="Settings"></div>
-        </div>
-        <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 15px; text-align: center;">&larr; Swipe to view &rarr;</p>
-    </section>
-
-    <section class="container legal-section">
-        <div id="support">
-            <h3>Support & Contact</h3>
-            <p>For questions, feedback, or support, reach out to us at: <a href="mailto:philip.zvar@gmail.com">philip.zvar@gmail.com</a></p>
-        </div>
-
-        <div id="privacy" style="margin-top: 40px;">
-            <h3>Privacy Policy</h3>
-            <p><strong>GridStrike</strong> is built with privacy in mind:</p>
-            <ul>
-                <li><strong>No Collection:</strong> We do not collect or store any personal user data.</li>
-                <li><strong>Local Storage:</strong> Game progress and settings are kept strictly on your local device.</li>
-                <li><strong>No Tracking:</strong> There are no third-party trackers or ads in the app.</li>
-            </ul>
-        </div>
-    </section>
-
-    <footer>
-        &copy; 2026 Philipz Software. All rights reserved.<br>Made for watchOS.
-    </footer>
-
-</body>
-</html>
