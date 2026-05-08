@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GridStrike | Tactical Strategy for Apple Watch</title>
+    <style>
+        :root {
+            --apple-red: #ff3b30;
+            --apple-blue: #007aff;
+            --bg-dark: #0a0a0a;
+            --container-bg: #161617;
+            --text-main: #eeeeee;
+            --text-dim: #86868b;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        header {
+            padding: 60px 20px;
+            text-align: center;
+            max-width: 800px;
+        }
+
+        .app-icon {
+            width: 120px;
+            height: 120px;
+            border-radius: 24%;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.5);
+        }
+
+        .status-badge {
+            background-color: #ff9500;
+            color: #000;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin: 10px 0;
+            letter-spacing: -1px;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            color: var(--text-dim);
+            margin-bottom: 40px;
+        }
+
+        .container {
+            max-width: 900px;
+            width: 90%;
+            background-color: var(--container-bg);
+            border-radius: 30px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-sizing: border-box;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            text-align: left;
+        }
+
+        .feature-box h3 {
+            color: var(--apple-red);
+            margin-bottom: 10px;
+        }
+
+        .screenshots-scroll {
+            display: flex;
+            overflow-x: auto;
+            gap: 20px;
+            padding: 20px 0;
+            width: 100%;
+            scrollbar-width: none; /* Firefox */
+        }
+        .screenshots-scroll::-webkit-scrollbar { display: none; } /* Chrome/Safari */
+
+        .screenshot-item {
+            flex: 0 0 auto;
+            width: 220px;
+            height: 270px;
+            background-color: #333;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #444;
+            color: #555;
+            font-weight: bold;
+        }
+
+        .screenshot-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 28px;
+        }
+
+        .legal-section {
+            text-align: left;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            padding-top: 40px;
+        }
+
+        a { color: var(--apple-blue); text-decoration: none; }
+        a:hover { text-decoration: underline; }
+
+        footer {
+            padding: 40px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="status-badge">COMING SOON TO watchOS</div>
+        <img src="GridStrike_appicon.png" alt="GridStrike Icon" class="app-icon">
+        <h1>GridStrike</h1>
+        <p class="tagline">Tactical warfare. Designed for the wrist.</p>
+    </header>
+
+    <section class="container">
+        <h2>The Experience</h2>
+        <div class="features">
+            <div class="feature-box">
+                <h3>Turn-Based Strategy</h3>
+                <p>Command your fleet in a calculated battle of wits. Every move counts in this optimized grid-based combat system.</p>
+            </div>
+            <div class="feature-box">
+                <h3>SmartOpponent AI</h3>
+                <p>Face an adaptive AI that hunts, probes, and strikes back. No two games are the same.</p>
+            </div>
+            <div class="feature-box">
+                <h3>Haptic Feedback</h3>
+                <p>Feel the tension. High-definition haptics bring every missile launch and impact directly to your wrist.</p>
+            </div>
+            <div class="feature-box">
+                <h3>Stand-alone Play</h3>
+                <p>Zero iPhone dependency. Play fully on your Apple Watch, anytime, anywhere.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="container">
+        <h2>Screenshots</h2>
+        <div class="screenshots-scroll">
+            <div class="screenshot-item"><img src="shot1.png" alt="Setup Phase"></div>
+            <div class="screenshot-item"><img src="shot2.png" alt="Grid View"></div>
+            <div class="screenshot-item"><img src="shot3.png" alt="Combat Action"></div>
+            <div class="screenshot-item"><img src="shot4.png" alt="Victory Screen"></div>
+            <div class="screenshot-item"><img src="shot5.png" alt="Settings"></div>
+        </div>
+        <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 10px;">&larr; Scroll to view more &rarr;</p>
+    </section>
+
+    <section class="container legal-section">
+        <div id="support">
+            <h3>Support & Contact</h3>
+            <p>Need help or have suggestions? Reach out to us at: <a href="mailto:philip.zvar@gmail.com">philip.zvar@gmail.com</a></p>
+        </div>
+
+        <div id="privacy" style="margin-top: 30px;">
+            <h3>Privacy Policy</h3>
+            <p><strong>GridStrike</strong> respects your privacy. Our policy is simple:</p>
+            <ul>
+                <li><strong>No Data Collection:</strong> We do not collect, store, or share any personal information.</li>
+                <li><strong>Local Storage:</strong> All game progress and settings are stored exclusively on your local device.</li>
+                <li><strong>No Tracking:</strong> There are no third-party trackers or analytics embedded in the app.</li>
+            </ul>
+        </div>
+    </section>
+
+    <footer>
+        &copy; 2026 Philipz Software. Built for Apple Watch.
+    </footer>
+
+</body>
+</html>
