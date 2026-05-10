@@ -13,9 +13,9 @@ enum Assets {
     static let water = Image("water")
     static let headquarters = Image("HeadquarterTile")
     static let missile = Image("MissileTile")
-    /// Bomber on the player’s home grass — opaque art with grass baked in (`bomber.png`).
+    /// Bomber on home grass (north or south) — opaque art with grass baked in (`bomber.png`).
     static let bomberOnGrass = Image("bomber")
-    /// Bomber everywhere else (enemy zone, fly-through overlays): transparent silhouette.
+    /// Bomber off-grass (shouldn’t appear on the grid in normal play) and fly-through overlays.
     static let bomberTransparent = Image("bomber_transparent")
     static let coastguard = Image("CruiserTile")
     /// Wreck art rendered on a coastguard tile after the cruiser is destroyed
@@ -29,8 +29,7 @@ enum Assets {
     static let missileInWater = Image("MissileInWater")
     static let splashBackground = Image("SplashBackground")
     /// Full-bleed art shown behind the Victory overlay — celebratory soldier
-    /// silhouette painted to read against the dark scrim that hosts the
-    /// "Victory!" label and the New game / Map buttons.
+    /// silhouette painted to read against the dark scrim that hosts the title.
     static let victoryBackground = Image("VictoryBackground")
     /// Mirror of `victoryBackground` for the defeat path. Same composition
     /// language (single soldier, sunset sky) so the two end-game screens
@@ -58,7 +57,10 @@ enum Assets {
         case .headquarters: return headquarters
         case .missile: return missile
         case .bomber:
-            if Zones.southGrass.contains(position.row) {
+            // `bomber.png` includes grass; use it on both home halves so tiles aren’t
+            // punched through to black (`bomber_transparent` is only for overlays /
+            // contexts that composite on top of something else).
+            if Zones.isAnyGrass(position.row) {
                 return bomberOnGrass
             }
             return bomberTransparent

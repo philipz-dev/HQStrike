@@ -52,6 +52,15 @@ enum GameReducer {
         case .newGame:
             return (.newGame(), [])
 
+        case .finishPostGameMapReview:
+            var next = GameState.newGame()
+            next.welcomePresentStartMenu = true
+            return (next, [])
+
+        case .clearWelcomeStartMenuRequest:
+            s.welcomePresentStartMenu = false
+            return (s, [])
+
         case .acknowledgeDestructionAlert:
             if !s.pendingDestructionAlerts.isEmpty {
                 s.pendingDestructionAlerts.removeFirst()
@@ -344,13 +353,34 @@ enum GameReducer {
             return
         }
 
-        applyBomberFirstDrop(state: &s, attacker: attacker, source: source, target: pos, effects: &effects)
+        beginPlayerBomberFlight(state: &s, source: source, target: pos, effects: &effects)
+    }
+
+    /// Player bomber: record impact + enter `.bombingDrops` at `dropsApplied: 0` with no
+    /// drops yet — `BoardView` drives `advanceBombDrop` on the demo timeline; opponent
+    /// bombers still use `applyBomberFirstDrop` + timed ticks.
+    private static func beginPlayerBomberFlight(
+        state s: inout GameState,
+        source: GridPosition,
+        target pos: GridPosition,
+        effects: inout [SideEffect]
+    ) {
+        let attacker = Side.player
+        let drops = Rules.bombingPositions(target: pos, attacker: attacker)
+        recordAttackImpact(state: &s, attacker: attacker, cells: [pos])
+        s.inFlightBombDestructions = []
+        guard !drops.isEmpty else {
+            finalizeBombingRun(state: &s, source: source, attacker: attacker, effects: &effects)
+            return
+        }
+        s.phase = .play(.bombingDrops(source: source, target: pos, dropsApplied: 0))
     }
 
     /// Commits the bomber's first drop and switches to `.bombingDrops` so the
     /// scheduled `advanceBombDrop` ticks can roll out the rest of the column.
-    /// Called immediately for player bombers; via `Action.applyOpponentImpact`
-    /// for the AI's bombers once the camera reaches the target column.
+    /// Used for opponent bombers via `Action.applyOpponentImpact` once the camera
+    /// reaches the target column. Player bombers use `beginPlayerBomberFlight` +
+    /// timeline-driven `advanceBombDrop` from `BoardView`.
     ///
     /// When the anchor sits near the defender's back row some drops walk off
     /// the board and `Rules.bombingPositions` returns fewer than 3 cells.
@@ -400,7 +430,9 @@ enum GameReducer {
         let next = n + 1
         if next < drops.count {
             s.phase = .play(.bombingDrops(source: source, target: target, dropsApplied: next))
-            effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
+            if attacker == .opponent {
+                effects.append(.scheduleAdvanceBombDrop(afterSeconds: 1))
+            }
         } else {
             // HQ end-game is set inside `applyBombDrop` the moment a drop
             // lands on the HQ, so we don't re-check the (now-empty) cells.

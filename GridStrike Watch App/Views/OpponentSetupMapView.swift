@@ -5,9 +5,8 @@
 //  Post-game frozen snapshot at round start (`boardAtPlayStart`). Layout deliberately
 //  mirrors `BoardView` (same tile width, no extra top/bottom gutter, same horizontal
 //  padding) so the map renders in the **original grid colours** instead of looking
-//  shrunken or ghosted inside a dark frame. The close button rides as a non-flow
-//  overlay anchored to the top-left corner — sized for a comfortable fingertip
-//  target and nudged up into the safe-area top inset so it sits high on screen.
+//  shrunken or ghosted inside a dark frame. Dismiss uses `PostGameCircularDismissButton`
+//  (top-left ×), matching Victory/Defeat → map navigation.
 //
 
 import SwiftUI
@@ -15,20 +14,6 @@ import SwiftUI
 struct OpponentSetupMapView: View {
     let frozenBoard: Board
     let onClose: () -> Void
-
-    /// Diameter of the floating close-X. Sized for an easy fingertip target
-    /// on the 41/45/49 mm watches; the visual circle and the hit region both
-    /// scale with this value.
-    private static let closeButtonSize: CGFloat = 40
-    /// Vertical nudge applied to the close button. Pulls the X up into the
-    /// safe-area top inset so it sits high on the screen as a proper corner
-    /// control instead of floating below the watch's status chrome.
-    private static let closeButtonTopOffset: CGFloat = -6
-    /// Tiny inset from the leading edge so the button clears the watch's
-    /// curved corner — without this, the left side of the circle gets
-    /// cropped by the bezel and taps near that edge are swallowed by the
-    /// system swipe-back gesture instead of hitting the button.
-    private static let closeButtonLeadingInset: CGFloat = 2
 
     var body: some View {
         GeometryReader { geo in
@@ -65,28 +50,10 @@ struct OpponentSetupMapView: View {
         }
         .background(Color.black.ignoresSafeArea())
         .overlay(alignment: .topLeading) {
-            // Floating close button — pinned to the top-left of the screen
-            // and nudged up into the safe-area top inset so it reads as a
-            // proper corner control rather than floating inside the grid.
-            // Hit-testing uses a square `contentShape` covering the whole
-            // 40×40 frame (instead of just the visible circle) so finger
-            // taps at the curved corner still register, and the leading
-            // inset keeps the circle clear of the bezel where watchOS would
-            // otherwise hijack the touch for its swipe-back gesture.
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 19, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: Self.closeButtonSize, height: Self.closeButtonSize)
-                    .background(Color.black.opacity(0.7))
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(Color.white.opacity(0.85), lineWidth: 1.25))
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, Self.closeButtonLeadingInset)
-            .padding(.top, Self.closeButtonTopOffset)
-            .accessibilityLabel("Close")
+            PostGameCircularDismissButton(
+                accessibilityLabel: "Close and return to menu",
+                action: onClose
+            )
         }
     }
 

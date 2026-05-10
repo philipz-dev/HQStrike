@@ -3,16 +3,17 @@
 //  GridStrike Watch App
 //
 //  Top-level switch — welcome vs. play container, plus the modal overlays. Uses one
-//  exhaustive switch over `UIMode` instead of separate optional/bool checks. Owns
-//  the post-game "Map" toggle so VictoryOverlay/DefeatOverlay can flip into a
-//  full-screen reveal of the AI's setup.
+//  exhaustive switch over `UIMode` instead of separate optional/bool checks. After a
+//  win or loss, Victory/Defeat appears first; a tap shows the frozen round-start map;
+//  closing the map returns to welcome with the Start game / Guide menu open.
 //
 
 import SwiftUI
 
 struct GameRootView: View {
     @Environment(GameStore.self) private var store
-    @State private var showOpponentMap = false
+    /// After the outcome screen, shows `OpponentSetupMapView` until closed with X.
+    @State private var showPostGameStartingBoardMap = false
 
     var body: some View {
         let snapshot = BoardSnapshot.compute(store.state)
@@ -29,42 +30,31 @@ struct GameRootView: View {
                 }
 
             case .victory:
-                if showOpponentMap {
-                    // No PlayContainerView behind — keep the frozen map exactly as
-                    // bright as the live grid (any bleed-through from the live
-                    // explosion overlays makes it read as ghosted/dark).
+                if showPostGameStartingBoardMap {
                     OpponentSetupMapView(
                         frozenBoard: store.state.boardAtPlayStart ?? store.state.board
                     ) {
-                        showOpponentMap = false
+                        store.send(.finishPostGameMapReview)
                     }
                 } else {
                     PlayContainerView(snapshot: snapshot)
-                    VictoryOverlay(
-                        onNewGame: {
-                            showOpponentMap = false
-                            store.send(.newGame)
-                        },
-                        onShowMap: { showOpponentMap = true }
-                    )
+                    VictoryOverlay {
+                        showPostGameStartingBoardMap = true
+                    }
                 }
 
             case .defeat:
-                if showOpponentMap {
+                if showPostGameStartingBoardMap {
                     OpponentSetupMapView(
                         frozenBoard: store.state.boardAtPlayStart ?? store.state.board
                     ) {
-                        showOpponentMap = false
+                        store.send(.finishPostGameMapReview)
                     }
                 } else {
                     PlayContainerView(snapshot: snapshot)
-                    DefeatOverlay(
-                        onNewGame: {
-                            showOpponentMap = false
-                            store.send(.newGame)
-                        },
-                        onShowMap: { showOpponentMap = true }
-                    )
+                    DefeatOverlay {
+                        showPostGameStartingBoardMap = true
+                    }
                 }
 
             case .setupConfirm:
@@ -81,6 +71,16 @@ struct GameRootView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: store.state.mode) { old, new in
+            switch new {
+            case .victory, .defeat:
+                if case .victory = old {} else if case .defeat = old {} else {
+                    showPostGameStartingBoardMap = false
+                }
+            default:
+                showPostGameStartingBoardMap = false
+            }
+        }
     }
 }
 
@@ -88,11 +88,19 @@ private struct PlayContainerView: View {
     let snapshot: BoardSnapshot
     @Environment(GameStore.self) private var store
 
+    /// Same “ignore taps” window as the reducer’s `.bombingDrops` branch — keeps the grid
+    /// from eating gestures while impacts are rolling (player flight is driven by `BoardView`).
+    private var boardAllowsHitTesting: Bool {
+        if store.state.isModalActive { return false }
+        if case .play(.bombingDrops) = store.state.phase { return false }
+        return true
+    }
+
     var body: some View {
         ZStack(alignment: .topLeading) {
             BoardView(snapshot: snapshot)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .allowsHitTesting(!store.state.isModalActive)
+                .allowsHitTesting(boardAllowsHitTesting)
 
             // Banner pinned to top — VStack + Spacer keeps multi-line text top-anchored
             // (Text in a maxHeight overlay would otherwise vertically center). The bar

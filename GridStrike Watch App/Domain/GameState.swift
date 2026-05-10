@@ -138,6 +138,10 @@ struct GameState: Equatable {
     /// Use `requestScroll(to:)` to mutate so the token always advances.
     var scrollRequest: ScrollRequest?
 
+    /// After `Action.finishPostGameMapReview`, `WelcomeView` opens the Start game / Guide
+    /// menu immediately instead of the splash. Cleared once the UI consumes it.
+    var welcomePresentStartMenu: Bool
+
     static func newGame() -> GameState {
         GameState(
             phase: .welcome,
@@ -155,7 +159,8 @@ struct GameState: Equatable {
             pendingEndGamePhase: nil,
             lastTurnHighlight: [],
             isInPostAttackCooldown: false,
-            scrollRequest: nil
+            scrollRequest: nil,
+            welcomePresentStartMenu: false
         )
     }
 

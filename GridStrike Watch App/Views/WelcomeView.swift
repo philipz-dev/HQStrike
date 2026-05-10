@@ -56,6 +56,12 @@ struct WelcomeView: View {
                 splashContent
             }
         }
+        .onAppear {
+            if store.state.welcomePresentStartMenu {
+                showStartMenu = true
+                store.send(.clearWelcomeStartMenuRequest)
+            }
+        }
     }
 
     // MARK: - Splash

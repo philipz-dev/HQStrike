@@ -281,7 +281,9 @@ struct BoardSnapshot: Equatable {
                 return !(Zones.isMissileTarget(pos) || isSelected)
             case .choosingBombTarget:
                 return !(Zones.isBombingTarget(pos) || isSelected)
-            case .idle, .shotDown, .bombingDrops:
+            case .bombingDrops:
+                return true
+            case .idle, .shotDown:
                 return false
             }
         }
