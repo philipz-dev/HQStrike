@@ -38,8 +38,8 @@ enum SetupStep: CaseIterable, Equatable {
     var instruction: String {
         switch self {
         case .placeHeadquarter: return "Place headquarter"
-        case .placeMissile1: return "Place missile 1"
-        case .placeMissile2: return "Place missile 2"
+        case .placeMissile1: return "Place first missile"
+        case .placeMissile2: return "Place second missile"
         case .placeBomber: return "Place bomber"
         case .placeCoastguard: return "Place coastguard"
         }

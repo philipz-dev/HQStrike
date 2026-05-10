@@ -2,7 +2,7 @@
 //  ContentView.swift
 //  GridStrike Watch App
 //
-//  Thin shell — the entire game now lives in `GameRootView` and below.
+//  Thin shell — the entire game lives in `GameRootView` (welcome splash first).
 //
 
 import SwiftUI

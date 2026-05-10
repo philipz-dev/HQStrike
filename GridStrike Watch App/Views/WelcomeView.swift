@@ -2,20 +2,55 @@
 //  WelcomeView.swift
 //  GridStrike Watch App
 //
+//  First screen: splash artwork with the `?` help glyph in the top-left.
+//  Tapping anywhere reveals a small in-place menu with two choices —
+//  "Start game" (begins setup) and "Manual" (swaps to the manual inline).
+//
+//  Manual is presented inline (not via `.fullScreenCover`) so the OS doesn't
+//  layer a system close chrome on top of our own X. The manual's own X is
+//  the single close affordance and it routes straight into setup so the
+//  player never has to tap "Start game" separately after reading the rules.
+//
 
 import SwiftUI
 
 struct WelcomeView: View {
     @Environment(GameStore.self) private var store
     @State private var showHelp = false
+    @State private var showManual = false
+    @State private var showStartMenu = false
+    @State private var showMissileDemo = false
+    @State private var showBomberDemo = false
 
     var body: some View {
+        ZStack {
+            if showBomberDemo {
+                BomberDemo(onClose: { showBomberDemo = false })
+            } else if showMissileDemo {
+                MissileDemo(onClose: { showMissileDemo = false })
+            } else if showManual {
+                // Inline presentation — no `.fullScreenCover`, so no system
+                // close button is layered on top of the manual's own X.
+                ManualView(onClose: {
+                    showManual = false
+                    showStartMenu = false
+                    store.send(.dismissWelcome)
+                })
+            } else {
+                splashContent
+            }
+        }
+        .sheet(isPresented: $showHelp) {
+            NavigationStack {
+                HelpView()
+            }
+        }
+    }
+
+    // MARK: - Splash
+
+    private var splashContent: some View {
         ZStack(alignment: .topLeading) {
-            // Background visuals — purely decorative, hit-testing is disabled
-            // so taps fall through to the dedicated dismiss layer below.
-            // The previous black-dim overlay has been removed; the title text
-            // gets its own black outline below for legibility against the
-            // raw splash artwork instead.
             Assets.splashBackground
                 .resizable()
                 .scaledToFill()
@@ -24,17 +59,14 @@ struct WelcomeView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            // Tap-anywhere-to-start surface. Sits below the help button in the
-            // ZStack so the button consumes its own taps; everywhere else
-            // routes through here and dispatches `.dismissWelcome`.
+            // Tap-anywhere surface — first tap reveals the start menu.
+            // Once the menu is up, taps inside the menu's buttons take
+            // precedence; taps outside dismiss the menu (handled by the
+            // menu overlay's own background).
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { store.send(.dismissWelcome) }
+                .onTapGesture { showStartMenu = true }
 
-            // Welcome label pinned to the bottom — also non-interactive so it
-            // doesn't swallow the tap-to-start gesture above. Outlined in
-            // black via stacked offset copies so the white fill stays
-            // legible on any region of the splash.
             VStack {
                 Spacer()
                 OutlinedText(
@@ -48,19 +80,9 @@ struct WelcomeView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
 
-            // `?` glyph anchored to the very top-left corner. Bigger than the
-            // previous icon (28 pt) so it's an obvious affordance, with
-            // padding pulled all the way down so it sits flush against the
-            // safe-area edge. Buttons consume taps inside their bounds, so
-            // the dismiss gesture only fires when the user taps elsewhere.
             Button {
                 showHelp = true
             } label: {
-                // Outlined glyph (no filled disc behind the `?`) — the user
-                // asked for the help affordance to lose its background plate
-                // so the splash artwork shows through where the dark circle
-                // used to sit. A plain shadow keeps the white strokes
-                // readable against any region of the splash.
                 Image(systemName: "questionmark.circle")
                     .font(.system(size: 28, weight: .semibold))
                     .foregroundStyle(.white)
@@ -69,22 +91,91 @@ struct WelcomeView: View {
             .buttonStyle(.plain)
             .padding(.leading, 4)
             .padding(.top, 0)
-            // Pulls the glyph up into the bezel corner so it sits above the
-            // splash artwork's reticle ring instead of overlapping it. Pure
-            // visual offset — the safe-area padding above keeps the button's
-            // hit-target on screen, the offset just shifts where the glyph
-            // is drawn relative to that anchor.
             .offset(y: -20)
             .accessibilityLabel("How to play")
+
+            // Small O buttons for scripted demos (screen recording).
+            VStack(spacing: 6) {
+                Button {
+                    showBomberDemo = false
+                    showMissileDemo = true
+                } label: {
+                    Text("O")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.18))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play missile demo")
+
+                Button {
+                    showMissileDemo = false
+                    showBomberDemo = true
+                } label: {
+                    Text("O")
+                        .font(.system(size: 10, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(Color.white.opacity(0.18))
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Play bomber demo")
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(.trailing, 4)
+            .padding(.top, 0)
+            .offset(y: -20)
         }
-        .sheet(isPresented: $showHelp) {
-            // NavigationStack supplies the inline title bar + toolbar slot for
-            // the Done button, and lets the sheet present as a proper modal
-            // page instead of just bare scroll content.
-            NavigationStack {
-                HelpView()
+        .overlay {
+            if showStartMenu {
+                startMenuOverlay
             }
         }
+    }
+
+    /// Two-button choice screen revealed by the first tap on the splash.
+    /// Background is fully opaque so the splash artwork is hidden — the menu
+    /// reads as its own dedicated screen rather than a translucent overlay.
+    private var startMenuOverlay: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                // Tap outside the buttons returns to the splash. The buttons
+                // sit on top of this layer so their hits don't fall through.
+                .onTapGesture { showStartMenu = false }
+
+            VStack(spacing: 10) {
+                Button {
+                    showStartMenu = false
+                    store.send(.dismissWelcome)
+                } label: {
+                    Text("Start game")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(EndGamePalette.mutedGreen)
+
+                Button {
+                    showStartMenu = false
+                    showManual = true
+                } label: {
+                    Text("Manual")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(EndGamePalette.mutedGray)
+            }
+            .padding(.horizontal, 14)
+        }
+        .transition(.opacity)
     }
 }
 
