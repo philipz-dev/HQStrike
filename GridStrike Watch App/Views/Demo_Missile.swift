@@ -3,8 +3,8 @@
 //  GridStrike Watch App
 //
 //  Scripted trailer: hand → home missile → enemy anchor tap; scroll pins row 6; `missiletransparent`
-//  flies up the anchor column while the board scrolls to top; when the sprite reaches row 2 all salvo
-//  impacts appear at once and the flying sprite is removed — tap anywhere to dismiss.
+//  flies up the anchor column while the board scrolls to top; salvo + sprite removal when the centre crosses
+//  row 2 mid plus **half a sprite height** south; opacity hides once the bottom clears half that height below the top.
 //
 
 import SwiftUI
@@ -173,8 +173,9 @@ struct Demo_Missile: View {
                         let elapsed = timeline.date.timeIntervalSince(flight.startTime)
                         let p = min(1.0, elapsed / flight.duration)
                         let y = flight.startY + (flight.endY - flight.startY) * CGFloat(p)
+                        // Hide once the bottom edge clears **half a sprite height** below the viewport top (not flush at y = 0).
                         let bottomOfMissile = y + flight.halfHeight
-                        let showMissile = bottomOfMissile > 0
+                        let showMissile = bottomOfMissile > flight.halfHeight
 
                         Image("missiletransparent")
                             .resizable()
@@ -308,12 +309,12 @@ struct Demo_Missile: View {
         )
         let O1: CGFloat = 0
 
-        func tauWhenCrossingRow(_ row: Int) -> TimeInterval {
-            let yTileMid = CGFloat(row) * tw + tw / 2
-            let num = yTileMid - O0 - startY
+        /// Time when the missile **centre** crosses this board content Y (tile midlines ± offsets), with scroll `O0→O1`.
+        func tauWhenCrossingContentYMid(_ contentYMid: CGFloat) -> TimeInterval {
+            let num = contentYMid - O0 - startY
             let den = (endY - startY) + (O1 - O0)
             guard abs(den) > 0.5 else {
-                return T * TimeInterval((yTileMid - startY) / (endY - startY))
+                return T * TimeInterval((contentYMid - startY) / (endY - startY))
             }
             let p = num / den
             return T * TimeInterval(max(0, min(1, p)))
@@ -334,15 +335,17 @@ struct Demo_Missile: View {
             proxy.scrollTo("row-0", anchor: .top)
         }
 
-        // Anchor row (2): show full salvo and dismiss `missiletransparent` when the sprite crosses here.
+        // Anchor row (2): impacts + dismiss when sprite centre crosses row mid **plus half a sprite height south** (“half size lower”).
         let triggerRow = Self.enemyMissileAnchor.row
-        var tauAtRow2 = tauWhenCrossingRow(triggerRow)
-        tauAtRow2 = max(0, min(T, tauAtRow2))
+        let yRowMid = CGFloat(triggerRow) * tw + tw / 2
+        let yDismissMid = yRowMid + half
+        var tauDismiss = tauWhenCrossingContentYMid(yDismissMid)
+        tauDismiss = max(0, min(T, tauDismiss))
 
         let elapsedBeforeWait = Date().timeIntervalSince(flightStart)
-        let waitRow2 = max(0, tauAtRow2 - elapsedBeforeWait)
-        if waitRow2 > 0 {
-            try? await Task.sleep(for: .seconds(waitRow2))
+        let waitDismiss = max(0, tauDismiss - elapsedBeforeWait)
+        if waitDismiss > 0 {
+            try? await Task.sleep(for: .seconds(waitDismiss))
         }
 
         var overlays: [GridPosition: ExplosionKind] = [:]
