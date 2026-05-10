@@ -1,16 +1,15 @@
 //
-//  Demo_Missile.swift
+//  Demo_Coastguard.swift
 //  GridStrike Watch App
 //
-//  Scripted trailer: hand → home missile → enemy anchor tap; scroll pins row 6; `missiletransparent`
-//  flies up the anchor column while the board scrolls to top; salvo + sprite removal when the centre crosses
-//  row 2 mid plus **half a sprite height** south; opacity hides once the bottom clears half that height below the top.
+//  Coastguard intercept trailer: fly-up with scroll pinned to row 6; on intercept, explosion overlay on row 6 scales up
+//  then fades; coastguard fades in on row 5 (`Missile intercepted by coastguard!`).
 //
 
 import SwiftUI
 import WatchKit
 
-/// Parameters for the scripted missile overlay (linear motion + scroll matched to `O0` → row 0 at top).
+/// Parameters for the scripted missile overlay (linear screen motion; scroll stays pinned).
 private struct MissileFlightSpec {
     let startTime: Date
     let duration: TimeInterval
@@ -18,11 +17,9 @@ private struct MissileFlightSpec {
     let startY: CGFloat
     let endY: CGFloat
     let halfHeight: CGFloat
-    /// Content Y coordinate pinned to the top of the viewport at flight start (`scrollTo` mid-board).
-    let O0: CGFloat
 }
 
-struct Demo_Missile: View {
+struct Demo_Coastguard: View {
     let onClose: () -> Void
 
     private static let bottomCurveTapReserve: CGFloat = 10
@@ -44,6 +41,11 @@ struct Demo_Missile: View {
     private static let missileFlightSpriteTileFactor: CGFloat = 1.22
     /// Hand flies to `demoMissile2` (matches prior missile demo pacing).
     private static let handFlyToHomeMissileDuration: TimeInterval = 1.75
+    /// Intercept explosion: scale 25% → 200%, then fade out.
+    private static let interceptExplosionGrowDuration: TimeInterval = 0.14 * 1.2
+    private static let interceptExplosionFadeDuration: TimeInterval = 0.24
+    /// Fade-in for the coastguard overlay on row 5.
+    private static let interceptCoastguardFadeDuration: TimeInterval = 2.4 * 1.2
 
     // MARK: - Demo layout (row, col)
 
@@ -54,6 +56,8 @@ struct Demo_Missile: View {
     private static let demoCoastguard = GridPosition(8, 3)
     /// Enemy grass anchor for the scripted missile tap (X-pattern centre).
     private static let enemyMissileAnchor = GridPosition(2, 3)
+    /// Flying sprite is removed when its centre crosses this row (one row south of row 5 water band).
+    private static let missileDismissRow = 6
     /// Vertical / reference column for first hand pose (row 12, col 2). Hand image is
     /// shifted **`handStartHorizontalOffsetTiles`** to the right of that column centre.
     private static let handStartTile = GridPosition(12, 2)
@@ -68,10 +72,14 @@ struct Demo_Missile: View {
     @State private var handPosition = CGPoint.zero
     @State private var highlightPlayerMissile = false
     @State private var highlightEnemyAnchor = false
-    @State private var missileImpactOverlays: [GridPosition: ExplosionKind] = [:]
     @State private var showHitBanner = false
-    /// When non-nil, timeline-driven `missiletransparent` overlay (cleared when impacts flash at row 2).
+    /// When non-nil, timeline-driven `missiletransparent` overlay (cleared when centre crosses row 6).
     @State private var missileFlightSpec: MissileFlightSpec?
+    @State private var showInterceptExplosionOverlay = false
+    @State private var interceptExplosionScale: CGFloat = 0.25
+    @State private var interceptExplosionOpacity: CGFloat = 1
+    @State private var showInterceptCoastguardOverlay = false
+    @State private var interceptCoastguardOpacity: CGFloat = 0
 
     var body: some View {
         GeometryReader { geo in
@@ -79,10 +87,17 @@ struct Demo_Missile: View {
             let missileSprite = tileWidth * Self.missileFlightSpriteTileFactor
             let bottomInset = geo.safeAreaInsets.bottom
             let pullDown = max(0, bottomInset - Self.bottomCurveTapReserve)
+            let contentH = CGFloat(Zones.rowCount) * tileWidth + pullDown
+            let maxScroll = max(0, contentH - geo.size.height)
+            let scrollTopPinnedRow6 = Self.clampedScrollOffsetPinningBottomOfRow(
+                rowIndex: 6,
+                tileWidth: tileWidth,
+                viewportHeight: geo.size.height,
+                maxScroll: maxScroll
+            )
             let tiles = makeTileMap(
                 highlightPlayerMissile: highlightPlayerMissile,
-                highlightEnemyAnchor: highlightEnemyAnchor,
-                missileImpactOverlays: missileImpactOverlays
+                highlightEnemyAnchor: highlightEnemyAnchor
             )
 
             ZStack(alignment: .topLeading) {
@@ -154,7 +169,7 @@ struct Demo_Missile: View {
 
                 VStack(spacing: 0) {
                     if showHitBanner {
-                        Text("Hostile missile hit!")
+                        Text("Missile intercepted by coastguard!")
                             .font(.caption.weight(.semibold))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
@@ -177,6 +192,45 @@ struct Demo_Missile: View {
                         .frame(width: Self.handSize, height: Self.handSize)
                         .shadow(color: .black.opacity(0.45), radius: 3, y: 2)
                         .position(handPosition)
+                        .allowsHitTesting(false)
+                }
+
+                if showInterceptCoastguardOverlay {
+                    let hp = BoardGridMetrics.horizontalPadding
+                    let cgCentre = Self.tileCentreScreen(
+                        row: 5,
+                        col: Self.enemyMissileAnchor.col,
+                        tw: tileWidth,
+                        hp: hp,
+                        scrollTopContentY: scrollTopPinnedRow6
+                    )
+                    Assets.coastguard
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: tileWidth * 0.92, height: tileWidth * 0.92)
+                        .position(cgCentre)
+                        .opacity(interceptCoastguardOpacity)
+                        .allowsHitTesting(false)
+                }
+
+                if showInterceptExplosionOverlay {
+                    let hp = BoardGridMetrics.horizontalPadding
+                    let boomCentre = Self.tileCentreScreen(
+                        row: Self.missileDismissRow,
+                        col: Self.enemyMissileAnchor.col,
+                        tw: tileWidth,
+                        hp: hp,
+                        scrollTopContentY: scrollTopPinnedRow6
+                    )
+                    Assets.explosionImage(for: .hit)
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .frame(width: tileWidth * 0.92, height: tileWidth * 0.92)
+                        .scaleEffect(interceptExplosionScale)
+                        .opacity(interceptExplosionOpacity)
+                        .position(boomCentre)
                         .allowsHitTesting(false)
                 }
 
@@ -205,7 +259,7 @@ struct Demo_Missile: View {
                     .contentShape(Rectangle())
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .onTapGesture { onClose() }
-                    .accessibilityLabel("Dismiss missile demo")
+                    .accessibilityLabel("Dismiss coastguard demo")
             }
             .overlay(alignment: .topLeading) {
                 DemoTopCloseButton(
@@ -229,9 +283,13 @@ struct Demo_Missile: View {
         showDemoFinished = false
         try? await Task.sleep(for: .seconds(1))
 
-        missileImpactOverlays = [:]
         showHitBanner = false
         missileFlightSpec = nil
+        showInterceptExplosionOverlay = false
+        interceptExplosionScale = 0.25
+        interceptExplosionOpacity = 1
+        showInterceptCoastguardOverlay = false
+        interceptCoastguardOpacity = 0
 
         let tw = BoardGridMetrics.tileWidth(forContainerWidth: size.width)
         let handAtStartTile = Self.handCentreWithTopOfFrameAtTileLowerThird(
@@ -303,14 +361,6 @@ struct Demo_Missile: View {
         }
         try? await Task.sleep(for: .seconds(Self.scrollToMidBoardBeforeMissileDuration))
 
-        let salvo = Rules.missilePositions(anchor: Self.enemyMissileAnchor, attacker: .player)
-        let nw = GridPosition(Self.enemyMissileAnchor.row - 1, Self.enemyMissileAnchor.col - 1)
-        guard !salvo.isEmpty else {
-            highlightEnemyAnchor = false
-            showDemoFinished = true
-            return
-        }
-
         let hp = BoardGridMetrics.horizontalPadding
         let col = Self.enemyMissileAnchor.col
         let cx = hp + CGFloat(col) * tw + tw / 2
@@ -328,17 +378,13 @@ struct Demo_Missile: View {
             viewportHeight: size.height,
             maxScroll: maxScroll
         )
-        let O1: CGFloat = 0
-
-        /// Time when the missile **centre** crosses this board content Y (tile midlines ± offsets), with scroll `O0→O1`.
-        func tauWhenCrossingContentYMid(_ contentYMid: CGFloat) -> TimeInterval {
-            let num = contentYMid - O0 - startY
-            let den = (endY - startY) + (O1 - O0)
-            guard abs(den) > 0.5 else {
-                return T * TimeInterval((contentYMid - startY) / (endY - startY))
-            }
-            let p = num / den
-            return T * TimeInterval(max(0, min(1, p)))
+        // Fixed scroll at row-6 bottom: screen Y of a board content midline is `contentY - O0`.
+        func tauWhenMissileCentreCrossesContentYMid(_ contentYMid: CGFloat) -> TimeInterval {
+            let targetScreenY = contentYMid - O0
+            let den = endY - startY
+            guard abs(den) > 1 else { return 0 }
+            let u = (targetScreenY - startY) / den
+            return max(0, min(T, T * TimeInterval(u)))
         }
 
         let flightStart = Date()
@@ -348,19 +394,12 @@ struct Demo_Missile: View {
             cx: cx,
             startY: startY,
             endY: endY,
-            halfHeight: half,
-            O0: O0
+            halfHeight: half
         )
 
-        withAnimation(.linear(duration: T)) {
-            proxy.scrollTo("row-0", anchor: .top)
-        }
-
-        // Anchor row (2): impacts + dismiss when sprite centre crosses row mid **plus half a sprite height south** (“half size lower”).
-        let triggerRow = Self.enemyMissileAnchor.row
-        let yRowMid = CGFloat(triggerRow) * tw + tw / 2
-        let yDismissMid = yRowMid + half
-        var tauDismiss = tauWhenCrossingContentYMid(yDismissMid)
+        // Dismiss fly sprite when centre crosses row 6 mid (one row below former row-5 cue).
+        let yDismissMid = CGFloat(Self.missileDismissRow) * tw + tw / 2
+        var tauDismiss = tauWhenMissileCentreCrossesContentYMid(yDismissMid)
         tauDismiss = max(0, min(T, tauDismiss))
 
         let elapsedBeforeWait = Date().timeIntervalSince(flightStart)
@@ -369,15 +408,31 @@ struct Demo_Missile: View {
             try? await Task.sleep(for: .seconds(waitDismiss))
         }
 
-        var overlays: [GridPosition: ExplosionKind] = [:]
-        for pos in salvo {
-            overlays[pos] = (pos == nw) ? .hit : .miss
+        missileFlightSpec = nil
+
+        showInterceptExplosionOverlay = true
+        interceptExplosionScale = 0.25
+        interceptExplosionOpacity = 1
+
+        showInterceptCoastguardOverlay = true
+        interceptCoastguardOpacity = 0
+        withAnimation(.easeIn(duration: Self.interceptCoastguardFadeDuration)) {
+            interceptCoastguardOpacity = 1
         }
 
-        missileFlightSpec = nil
-        withAnimation(.easeOut(duration: 0.2)) {
-            missileImpactOverlays = overlays
+        await Task.yield()
+        withAnimation(.easeOut(duration: Self.interceptExplosionGrowDuration)) {
+            interceptExplosionScale = 2.0
         }
+        try? await Task.sleep(for: .seconds(Self.interceptExplosionGrowDuration))
+
+        withAnimation(.easeOut(duration: Self.interceptExplosionFadeDuration)) {
+            interceptExplosionOpacity = 0
+        }
+        try? await Task.sleep(for: .seconds(Self.interceptExplosionFadeDuration))
+        showInterceptExplosionOverlay = false
+        interceptExplosionScale = 0.25
+        interceptExplosionOpacity = 1
 
         let totalElapsed = Date().timeIntervalSince(flightStart)
         let remaining = max(0, T - totalElapsed)
@@ -394,6 +449,19 @@ struct Demo_Missile: View {
 
     private static func playOutlineTapHaptic() {
         WKInterfaceDevice.current().play(.click)
+    }
+
+    /// Screen-space centre of a tile when content offset **O** is pinned at the viewport top.
+    private static func tileCentreScreen(
+        row: Int,
+        col: Int,
+        tw: CGFloat,
+        hp: CGFloat,
+        scrollTopContentY O: CGFloat
+    ) -> CGPoint {
+        let cx = hp + CGFloat(col) * tw + tw / 2
+        let cy = CGFloat(row) * tw + tw / 2 - O
+        return CGPoint(x: cx, y: cy)
     }
 
     private static func clampedScrollOffsetPinningBottomOfRow(
@@ -429,8 +497,7 @@ struct Demo_Missile: View {
 
     private func makeTileMap(
         highlightPlayerMissile: Bool,
-        highlightEnemyAnchor: Bool,
-        missileImpactOverlays: [GridPosition: ExplosionKind]
+        highlightEnemyAnchor: Bool
     ) -> [GridPosition: TileRenderModel] {
         let marks: [GridPosition: Unit] = [
             Self.demoHQ: .headquarters,
@@ -460,7 +527,7 @@ struct Demo_Missile: View {
                     dim: .none,
                     offCoastguardFocusRow: false,
                     northStrikeOverlay: nil,
-                    dropOverlay: missileImpactOverlays[pos],
+                    dropOverlay: nil,
                     dropOverlayScale: 1,
                     waterWreck: nil,
                     wreckRotationDegrees: 0,
@@ -476,6 +543,6 @@ struct Demo_Missile: View {
 
 #if DEBUG
 #Preview {
-    Demo_Missile(onClose: {})
+    Demo_Coastguard(onClose: {})
 }
 #endif

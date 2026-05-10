@@ -144,6 +144,7 @@ struct BoardSnapshot: Equatable {
             offCoastguardFocusRow: offCoastguard,
             northStrikeOverlay: strikeOverlay,
             dropOverlay: dropOverlay,
+            dropOverlayScale: 1,
             waterWreck: wreck,
             wreckRotationDegrees: wreckRotation,
             border: border,

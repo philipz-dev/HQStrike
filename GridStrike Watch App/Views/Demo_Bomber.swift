@@ -6,7 +6,7 @@
 
 //  Scripted trailer: hand → bomber tile → scroll to enemy; tap → pauses → scroll so rows 5–6 sit on the bottom edge → bomber flies while board scrolls to top;
 
-//  impacts (miss / hit / miss) fire as the plane passes each row — tap anywhere to dismiss.
+//  impacts (miss / miss / hit on the upper tile) fire as the plane passes each row — tap anywhere to dismiss.
 
 //
 
@@ -84,6 +84,9 @@ struct Demo_Bomber: View {
 
     private static let bomberFlightSpriteTileFactor: CGFloat = 1.22
 
+    /// Hit impact: appears at **200%** on the crossing beat, then eases to **100%** (no pre-delay).
+    private static let hitExplosionShrinkDuration: TimeInterval = 0.22
+
     // MARK: - Demo layout (row, col)
 
 
@@ -114,6 +117,12 @@ struct Demo_Bomber: View {
 
     @State private var didStart = false
 
+    /// Hides the scroll content until the initial bottom pin scroll runs (avoids a top→bottom flash).
+    @State private var isBoardVisible = false
+
+    /// Circular close control appears only after the scripted beat finishes.
+    @State private var showDemoFinished = false
+
     @State private var showHand = false
 
     @State private var handPosition = CGPoint.zero
@@ -123,6 +132,8 @@ struct Demo_Bomber: View {
     @State private var highlightEnemyAnchor = false
 
     @State private var missileImpactOverlays: [GridPosition: ExplosionKind] = [:]
+
+    @State private var missileImpactOverlayScales: [GridPosition: CGFloat] = [:]
 
     @State private var showHitBanner = false
 
@@ -150,7 +161,9 @@ struct Demo_Bomber: View {
 
                 highlightEnemyAnchor: highlightEnemyAnchor,
 
-                missileImpactOverlays: missileImpactOverlays
+                missileImpactOverlays: missileImpactOverlays,
+
+                missileImpactOverlayScales: missileImpactOverlayScales
 
             )
 
@@ -240,6 +253,8 @@ struct Demo_Bomber: View {
 
                     .allowsHitTesting(false)
 
+                    .opacity(isBoardVisible ? 1 : 0)
+
                     .onAppear {
 
                         guard !didStart else { return }
@@ -248,21 +263,35 @@ struct Demo_Bomber: View {
 
                         let bottomId = "row-\(BoardGridMetrics.rowCount - 1)"
 
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
+                        DispatchQueue.main.async {
 
-                            proxy.scrollTo(bottomId, anchor: .bottom)
+                            var t = Transaction()
 
-                            Task {
+                            t.disablesAnimations = true
 
-                                await runSequence(
+                            withTransaction(t) {
 
-                                    proxy: proxy,
+                                proxy.scrollTo(bottomId, anchor: .bottom)
 
-                                    size: geo.size,
+                            }
 
-                                    pullDown: pullDown
+                            DispatchQueue.main.async {
 
-                                )
+                                isBoardVisible = true
+
+                                Task {
+
+                                    await runSequence(
+
+                                        proxy: proxy,
+
+                                        size: geo.size,
+
+                                        pullDown: pullDown
+
+                                    )
+
+                                }
 
                             }
 
@@ -386,6 +415,20 @@ struct Demo_Bomber: View {
 
             }
 
+            .overlay(alignment: .topLeading) {
+
+                DemoTopCloseButton(
+
+                    isVisible: showDemoFinished,
+
+                    onClose: onClose,
+
+                    screenHeight: geo.size.height
+
+                )
+
+            }
+
         }
 
         .background(Color.black.ignoresSafeArea())
@@ -410,9 +453,13 @@ struct Demo_Bomber: View {
 
     ) async {
 
+        showDemoFinished = false
+
         try? await Task.sleep(for: .seconds(1))
 
+        missileImpactOverlays = [:]
 
+        missileImpactOverlayScales = [:]
 
         // Start: same row / vertical alignment as row 12 col 2, but hand sits 1.5 tiles right of col 2 centre.
 
@@ -570,7 +617,7 @@ struct Demo_Bomber: View {
 
         let drops = Rules.bombingPositions(target: Self.enemyBomberTarget, attacker: .player)
 
-        let kinds: [ExplosionKind] = [.miss, .hit, .miss]
+        let kinds: [ExplosionKind] = [.miss, .miss, .hit]
 
 
 
@@ -668,6 +715,9 @@ struct Demo_Bomber: View {
 
         var previousTau: TimeInterval = 0
 
+        /// After the delayed hit finishes, shorten the **next** crossing wait by this (delay + scale animations).
+        var shortenNextCrossingDeltaBy: TimeInterval = 0
+
         for index in drops.indices {
 
             let pos = drops[index]
@@ -680,9 +730,13 @@ struct Demo_Bomber: View {
 
             previousTau = targetTau
 
-            if delta > 0 {
+            let sleepCrossing = max(0, delta - shortenNextCrossingDeltaBy)
 
-                try? await Task.sleep(for: .seconds(delta))
+            shortenNextCrossingDeltaBy = 0
+
+            if sleepCrossing > 0 {
+
+                try? await Task.sleep(for: .seconds(sleepCrossing))
 
             }
 
@@ -690,9 +744,45 @@ struct Demo_Bomber: View {
 
             overlays[pos] = kind
 
-            withAnimation(.easeOut(duration: 0.2)) {
+            if kind == .hit {
+
+                var scales = missileImpactOverlayScales
+
+                scales[pos] = 2
+
+                missileImpactOverlayScales = scales
 
                 missileImpactOverlays = overlays
+
+                await Task.yield()
+
+                withAnimation(.easeOut(duration: Self.hitExplosionShrinkDuration)) {
+
+                    var s = missileImpactOverlayScales
+
+                    s[pos] = 1
+
+                    missileImpactOverlayScales = s
+
+                }
+
+                try? await Task.sleep(for: .seconds(Self.hitExplosionShrinkDuration))
+
+                shortenNextCrossingDeltaBy = Self.hitExplosionShrinkDuration
+
+            } else {
+
+                var scales = missileImpactOverlayScales
+
+                scales[pos] = 1
+
+                withAnimation(.easeOut(duration: 0.2)) {
+
+                    missileImpactOverlays = overlays
+
+                    missileImpactOverlayScales = scales
+
+                }
 
             }
 
@@ -717,6 +807,8 @@ struct Demo_Bomber: View {
             showHitBanner = true
 
         }
+
+        showDemoFinished = true
 
     }
 
@@ -814,7 +906,9 @@ struct Demo_Bomber: View {
 
         highlightEnemyAnchor: Bool,
 
-        missileImpactOverlays: [GridPosition: ExplosionKind]
+        missileImpactOverlays: [GridPosition: ExplosionKind],
+
+        missileImpactOverlayScales: [GridPosition: CGFloat]
 
     ) -> [GridPosition: TileRenderModel] {
 
@@ -875,6 +969,8 @@ struct Demo_Bomber: View {
                     northStrikeOverlay: nil,
 
                     dropOverlay: missileImpactOverlays[pos],
+
+                    dropOverlayScale: missileImpactOverlayScales[pos] ?? 1,
 
                     waterWreck: nil,
 

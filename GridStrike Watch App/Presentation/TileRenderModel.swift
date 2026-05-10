@@ -38,6 +38,7 @@ struct TileRenderModel: Equatable {
     let offCoastguardFocusRow: Bool
     let northStrikeOverlay: ExplosionKind?
     let dropOverlay: ExplosionKind?
+    let dropOverlayScale: CGFloat
     let waterWreck: WaterWreck?
     /// Rotation applied to the water-wreck overlay. Player wrecks (downed by enemy
     /// coastguard) sit at **45°** to suggest the angle of impact; opponent wrecks

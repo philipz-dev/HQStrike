@@ -3,7 +3,7 @@
 //  GridStrike Watch App
 //
 //  Reference card with a board preview. Layout:
-//   • Floating close X in the top-left (matches HelpView's affordance side).
+//   • Floating close X in the top-left.
 //   • Two-column-style sections separated by thin red dividers.
 //   • Board preview uses a slightly inset tile size so the orange zone
 //     outlines never clip past the right edge of the watch.
@@ -264,6 +264,7 @@ struct ManualView: View {
             offCoastguardFocusRow: false,
             northStrikeOverlay: nil,
             dropOverlay: nil,
+            dropOverlayScale: 1,
             waterWreck: nil,
             wreckRotationDegrees: 0,
             border: .plain,

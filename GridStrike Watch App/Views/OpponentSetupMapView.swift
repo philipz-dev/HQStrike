@@ -125,6 +125,7 @@ struct OpponentSetupMapView: View {
             offCoastguardFocusRow: false,
             northStrikeOverlay: nil,
             dropOverlay: nil,
+            dropOverlayScale: 1,
             waterWreck: nil,
             wreckRotationDegrees: 0,
             border: .plain,

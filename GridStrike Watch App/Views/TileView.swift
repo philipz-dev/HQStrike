@@ -90,6 +90,7 @@ struct TileView: View, Equatable {
                 .interpolation(.high)
                 .scaledToFit()
                 .frame(width: tileSize * 0.92, height: tileSize * 0.92)
+                .scaleEffect(model.dropOverlayScale)
                 .allowsHitTesting(false)
         }
     }

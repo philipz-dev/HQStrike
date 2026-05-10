@@ -36,10 +36,13 @@ enum Assets {
     /// language (single soldier, sunset sky) so the two end-game screens
     /// feel like a paired set.
     static let defeatBackground = Image("DefeatBackground")
-    /// Aged parchment scroll used as the backdrop for the help/instructions
-    /// sheet. Resized vertically to fit whatever text length the help page
-    /// produces; horizontally clipped to the watch width.
-    static let parchment = Image("Parchment")
+
+    /// Manual hub: full-screen camouflage + weapon picker tiles.
+    static let manualMenuCamouflage = Image("ManualMenuCamouflage")
+    static let manualMenuGrenade = Image("ManualMenuGrenade")
+    static let manualMenuMissile = Image("ManualMenuMissile")
+    static let manualMenuBomber = Image("ManualMenuBomber")
+    static let manualMenuCoastguard = Image("ManualMenuCoastguard")
 
     static func tileImage(for background: TileBackground, at position: GridPosition) -> Image {
         switch background {

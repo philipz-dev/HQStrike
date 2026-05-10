@@ -2,47 +2,58 @@
 //  WelcomeView.swift
 //  GridStrike Watch App
 //
-//  First screen: splash artwork with the `?` help glyph in the top-left.
-//  Tapping anywhere reveals a small in-place menu with two choices —
-//  "Start game" (begins setup) and "Manual" (swaps to the manual inline).
+//  First screen: splash artwork. Tapping anywhere reveals a small in-place menu —
+//  "Start game" (begins setup) and "Guide" (weapon picker on camouflage, then manual inline).
 //
-//  Manual is presented inline (not via `.fullScreenCover`) so the OS doesn't
-//  layer a system close chrome on top of our own X. The manual's own X is
-//  the single close affordance and it routes straight into setup so the
-//  player never has to tap "Start game" separately after reading the rules.
+//  The guide hub is presented inline (not via `.fullScreenCover`) so the OS doesn't
+//  layer system close chrome on top of our own X. That X returns to the Start / Guide menu.
+//  Each weapon tile opens its scripted demo; a tap during a demo dismisses back to this
+//  four-tile camouflage hub (not the splash).
 //
 
 import SwiftUI
 
 struct WelcomeView: View {
     @Environment(GameStore.self) private var store
-    @State private var showHelp = false
-    @State private var showManual = false
+    @State private var showManualWeaponsMenu = false
     @State private var showStartMenu = false
     @State private var showMissileDemo = false
+    @State private var showCoastguardDemo = false
     @State private var showBomberDemo = false
+    @State private var showGrenadeDemo = false
 
     var body: some View {
         ZStack {
-            if showBomberDemo {
-                Demo_Bomber(onClose: { showBomberDemo = false })
+            if showGrenadeDemo {
+                Demo_Grenade(onClose: dismissDemoReturningToWeaponMenu)
+            } else if showBomberDemo {
+                Demo_Bomber(onClose: dismissDemoReturningToWeaponMenu)
+            } else if showCoastguardDemo {
+                Demo_Coastguard(onClose: dismissDemoReturningToWeaponMenu)
             } else if showMissileDemo {
-                Demo_Missile(onClose: { showMissileDemo = false })
-            } else if showManual {
-                // Inline presentation — no `.fullScreenCover`, so no system
-                // close button is layered on top of the manual's own X.
-                ManualView(onClose: {
-                    showManual = false
-                    showStartMenu = false
-                    store.send(.dismissWelcome)
-                })
+                Demo_Missile(onClose: dismissDemoReturningToWeaponMenu)
+            } else if showManualWeaponsMenu {
+                ManualWeaponsMenuView(
+                    onBack: {
+                        showManualWeaponsMenu = false
+                        showStartMenu = true
+                    },
+                    onSelect: { selection in
+                        showManualWeaponsMenu = false
+                        showMissileDemo = false
+                        showCoastguardDemo = false
+                        showBomberDemo = false
+                        showGrenadeDemo = false
+                        switch selection {
+                        case .grenade: showGrenadeDemo = true
+                        case .missile: showMissileDemo = true
+                        case .bomber: showBomberDemo = true
+                        case .coastguard: showCoastguardDemo = true
+                        }
+                    }
+                )
             } else {
                 splashContent
-            }
-        }
-        .sheet(isPresented: $showHelp) {
-            NavigationStack {
-                HelpView()
             }
         }
     }
@@ -50,7 +61,7 @@ struct WelcomeView: View {
     // MARK: - Splash
 
     private var splashContent: some View {
-        ZStack(alignment: .topLeading) {
+        ZStack {
             Assets.splashBackground
                 .resizable()
                 .scaledToFill()
@@ -79,57 +90,6 @@ struct WelcomeView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
-
-            Button {
-                showHelp = true
-            } label: {
-                Image(systemName: "questionmark.circle")
-                    .font(.system(size: 28, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.8), radius: 3, y: 1)
-            }
-            .buttonStyle(.plain)
-            .padding(.leading, 4)
-            .padding(.top, 0)
-            .offset(y: -20)
-            .accessibilityLabel("How to play")
-
-            // Small O buttons for scripted demos (screen recording).
-            VStack(spacing: 6) {
-                Button {
-                    showBomberDemo = false
-                    showMissileDemo = true
-                } label: {
-                    Text("O")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.18))
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play missile demo")
-
-                Button {
-                    showMissileDemo = false
-                    showBomberDemo = true
-                } label: {
-                    Text("O")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                        .background(Color.white.opacity(0.18))
-                        .clipShape(Circle())
-                        .overlay(Circle().stroke(Color.white.opacity(0.45), lineWidth: 1))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Play bomber demo")
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            .padding(.trailing, 4)
-            .padding(.top, 0)
-            .offset(y: -20)
         }
         .overlay {
             if showStartMenu {
@@ -164,9 +124,9 @@ struct WelcomeView: View {
 
                 Button {
                     showStartMenu = false
-                    showManual = true
+                    showManualWeaponsMenu = true
                 } label: {
-                    Text("Manual")
+                    Text("Guide")
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity)
                 }
@@ -177,8 +137,15 @@ struct WelcomeView: View {
         }
         .transition(.opacity)
     }
+
+    /// Ends any active scripted demo and shows the camouflage weapon hub again.
+    private func dismissDemoReturningToWeaponMenu() {
+        showGrenadeDemo = false
+        showBomberDemo = false
+        showCoastguardDemo = false
+        showMissileDemo = false
+        showManualWeaponsMenu = true
+    }
 }
 
-// `OutlinedText` lives in its own file (`OutlinedText.swift`) so the help
-// screen header can reuse the same crisp black-edged label without the
-// type having to live as a `private` helper inside the welcome view.
+// `OutlinedText` lives in its own file (`OutlinedText.swift`) for reuse on the splash and elsewhere.
