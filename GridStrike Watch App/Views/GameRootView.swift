@@ -5,7 +5,7 @@
 //  Top-level switch — welcome vs. play container, plus the modal overlays. Uses one
 //  exhaustive switch over `UIMode` instead of separate optional/bool checks. After a
 //  win or loss, Victory/Defeat appears first; tap anywhere to show the frozen round-start map;
-//  tap the map to return to welcome with the Start game / Guide menu open.
+//  tap the map to return to welcome with the tactical camo menu open (splash skipped).
 //
 
 import SwiftUI

@@ -76,6 +76,16 @@ enum Zones {
     /// source of truth so the AI doesn't have to recompute "is this a
     /// corner?" by hand in every targeting heuristic.
     static let missileCornerColumns: Set<Int> = [0, 4]
+
+    /// Opponent missile anchors on the player's grass to skip: corner columns waste
+    /// side diagonals; **rows 9 and 13** waste diagonals into water or off the board
+    /// (symmetric to player anchors on rows **4** and **0** attacking north).
+    static func isWastedOpponentMissileAnchor(_ pos: GridPosition) -> Bool {
+        if missileCornerColumns.contains(pos.col) { return true }
+        if pos.row == 9 || pos.row == 13 { return true }
+        return false
+    }
+
     /// Rows the player can grenade-strike during play. Includes the enemy grass (0–4) and the enemy
     /// coastguard's water row (5) so the player can take out the coastguard before mounting a column attack.
     static let grenadeTargetRows: ClosedRange<Int> = 0...5

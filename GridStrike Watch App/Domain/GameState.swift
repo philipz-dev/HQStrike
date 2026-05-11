@@ -136,8 +136,8 @@ struct GameState: Equatable {
     /// Use `requestScroll(to:)` to mutate so the token always advances.
     var scrollRequest: ScrollRequest?
 
-    /// After `Action.finishPostGameMapReview`, `WelcomeView` opens the Start game / Guide
-    /// menu immediately instead of the splash. Cleared once the UI consumes it.
+    /// After `Action.finishPostGameMapReview`, `WelcomeView` skips the splash and opens the
+    /// camo tactical menu (START ASSAULT / FIELD GUIDE) immediately. Cleared once the UI consumes it.
     var welcomePresentStartMenu: Bool
 
     /// Bumped on each missile salvo so hit tiles can run a one-shot explosion scale pulse.
@@ -253,6 +253,19 @@ extension GameState {
         guard pendingOpponentImpact == nil else { return false }
         guard case .play = phase else { return false }
         return currentTurn == .player
+    }
+
+    /// Vertical panning on the 14×5 board is only allowed while the human can
+    /// freely inspect their half between actions: opponent turn, post-strike
+    /// pause, and deferred AI impact scroll all lock the camera until play
+    /// opens up again.
+    var allowsPlayfieldScrolling: Bool {
+        guard case .play = phase else { return true }
+        guard !isModalActive else { return false }
+        guard currentTurn == .player else { return false }
+        guard !isInPostAttackCooldown else { return false }
+        guard pendingOpponentImpact == nil else { return false }
+        return true
     }
 
     /// True once the player has actually launched at least one bomb / missile /

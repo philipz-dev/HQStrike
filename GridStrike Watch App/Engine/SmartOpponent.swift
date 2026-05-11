@@ -26,23 +26,14 @@ import Foundation
 
 struct SmartOpponent: OpponentPolicy {
     /// Missile anchors in columns **1…3** keep all five X-pattern cells on-board;
-    /// columns **0** and **4** drop two side diagonals, and **row 13** drops southern
-    /// diagonals — `missileTargets` filters those anchors out so the AI never wastes
-    /// salvo cells off the field (see `isWastedOpponentMissileAnchor`).
+    /// columns **0** and **4** drop two side diagonals, and **rows 9 and 13** waste
+    /// pattern cells into water / off-board — `missileTargets` filters those anchors
+    /// out so the AI never wastes salvo cells (see `Zones.isWastedOpponentMissileAnchor`).
     private static let wideMissileColumns: ClosedRange<Int> = 1...3
     /// Probability of intentionally anchoring a missile in a corner column even
     /// when a wide column is available — keeps the AI from being completely
     /// predictable about the corners while still treating them as exceptions.
     private static let cornerMissileLapseProbability: Double = 0.05
-
-    /// Opponent missile anchors to skip on the player's grass: **columns 0 and 4**
-    /// waste side diagonals off-board; **row 13** wastes southern diagonals (worst at
-    /// corners — `(13,0)` and `(13,4)`).
-    private static func isWastedOpponentMissileAnchor(_ pos: GridPosition) -> Bool {
-        if Zones.missileCornerColumns.contains(pos.col) { return true }
-        if pos.row == 13 { return true }
-        return false
-    }
 
     /// Most recent row-8 grenade column the AI has played. Read by the next
     /// bomber / missile target picker so the follow-up launch reuses the
@@ -186,6 +177,19 @@ struct SmartOpponent: OpponentPolicy {
             return huntAction(state: state, belief: belief)
         }
 
+        // DEBUG: exhaust bomber/missile launcher taps (with relaxed column safety) before
+        // row-8 probes or grass hunts.
+        if GridStrikeOpponentDebugStrikeFilter.prefersBomberAndMissileFirst {
+            let safeCols = belief.safeCols
+            if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: safeCols) {
+                return action
+            }
+            let relaxed = Array(Zones.allColumns)
+            if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: relaxed) {
+                return action
+            }
+        }
+
         let cgResolved = belief.cgConfirmedDestroyed || belief.cgKnownColumn != nil
         let safeCols = belief.safeCols
         let hasSafeLaunch = hasViableLaunch(bombers: bombers, missiles: missiles, safeCols: safeCols)
@@ -203,7 +207,7 @@ struct SmartOpponent: OpponentPolicy {
                     return action
                 }
             }
-            if let action = probeAction(belief: belief) { return action }
+            if let action = probeAction(state: state, belief: belief) { return action }
             if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: safeCols) { return action }
             return huntAction(state: state, belief: belief)
         }
@@ -220,9 +224,14 @@ struct SmartOpponent: OpponentPolicy {
         return launchAction(bombers: bombers, missiles: missiles, safeCols: launchCols)
     }
 
-    /// Grenade tap on a random unprobed row-8 column.
-    private func probeAction(belief: Belief) -> Action? {
-        guard let col = belief.unprobedRow8Cols.randomElement() else { return nil }
+    /// Grenade tap on a random unprobed row-8 column (skips columns that still hold a
+    /// player coastguard when `GridStrikeDebug.opponentNeverAttacksPlayerCoastguardTiles`).
+    private func probeAction(state: GameState, belief: Belief) -> Action? {
+        let cols = belief.unprobedRow8Cols.filter { col in
+            let p = GridPosition(Zones.coastguardPlayerRow, col)
+            return GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: state.board, footprint: [p])
+        }
+        guard let col = cols.randomElement() else { return nil }
         return .tap(GridPosition(Zones.coastguardPlayerRow, col))
     }
 
@@ -288,6 +297,9 @@ struct SmartOpponent: OpponentPolicy {
             for col in Zones.allColumns {
                 let p = GridPosition(row, col)
                 if attacked.contains(p) { continue }
+                if !GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: state.board, footprint: [p]) {
+                    continue
+                }
                 if !safeColSet.isEmpty, safeColSet.contains(col) {
                     preferred.append(p)
                 } else {
@@ -313,17 +325,17 @@ struct SmartOpponent: OpponentPolicy {
             preferredLaunchCol = nil
             // Best on the preferred col: anchor and entire 3-drop column avoid
             // every previously attacked cell.
-            if let pick = bombingTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true).randomElement() {
+            if let pick = bombingTargets(board: state.board, cols: [preferred], exclude: attacked, avoidFootprintHits: true).randomElement() {
                 return .tap(pick)
             }
             // Acceptable: anchor itself isn't on a previously attacked cell.
-            if let pick = bombingTargets(cols: [preferred], exclude: attacked).randomElement() {
+            if let pick = bombingTargets(board: state.board, cols: [preferred], exclude: attacked).randomElement() {
                 return .tap(pick)
             }
             // Tolerable: use the preferred col even with full overlap so we
             // honour the row-8 follow-up rule; better an overlap on the right
             // column than walking off it entirely.
-            if let pick = bombingTargets(cols: [preferred], exclude: []).randomElement() {
+            if let pick = bombingTargets(board: state.board, cols: [preferred], exclude: []).randomElement() {
                 return .tap(pick)
             }
             // Preferred col yielded nothing — fall through to the general
@@ -333,19 +345,19 @@ struct SmartOpponent: OpponentPolicy {
         }
 
         // Best: a safe col where the anchor and every drop avoid prior attacks.
-        if let pick = bombingTargets(cols: safeCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
+        if let pick = bombingTargets(board: state.board, cols: safeCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
             return .tap(pick)
         }
         // Acceptable: a safe col with at least an un-attacked anchor.
-        if let pick = bombingTargets(cols: safeCols, exclude: attacked).randomElement() {
+        if let pick = bombingTargets(board: state.board, cols: safeCols, exclude: attacked).randomElement() {
             return .tap(pick)
         }
         // Tolerable: a safe col even with full overlap.
-        if let pick = bombingTargets(cols: safeCols, exclude: []).randomElement() {
+        if let pick = bombingTargets(board: state.board, cols: safeCols, exclude: []).randomElement() {
             return .tap(pick)
         }
         // Last resort: any legal target so the reducer never deadlocks.
-        return bombingTargets(cols: Array(Zones.allColumns), exclude: []).randomElement().map { .tap($0) }
+        return bombingTargets(board: state.board, cols: Array(Zones.allColumns), exclude: []).randomElement().map { .tap($0) }
     }
 
     private mutating func pickMissileTarget(state: GameState, belief: Belief) -> Action? {
@@ -355,14 +367,14 @@ struct SmartOpponent: OpponentPolicy {
         // a valid anchor — skip south-corner anchors that waste pattern cells off-board.
         if let preferred = preferredLaunchCol, belief.safeCols.contains(preferred) {
             preferredLaunchCol = nil
-            if let pick = missileTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true)
+            if let pick = missileTargets(board: state.board, cols: [preferred], exclude: attacked, avoidFootprintHits: true)
                 .randomElement() {
                 return .tap(pick)
             }
-            if let pick = missileTargets(cols: [preferred], exclude: attacked).randomElement() {
+            if let pick = missileTargets(board: state.board, cols: [preferred], exclude: attacked).randomElement() {
                 return .tap(pick)
             }
-            if let pick = missileTargets(cols: [preferred], exclude: []).randomElement() {
+            if let pick = missileTargets(board: state.board, cols: [preferred], exclude: []).randomElement() {
                 return .tap(pick)
             }
         } else {
@@ -373,36 +385,36 @@ struct SmartOpponent: OpponentPolicy {
         let safeCornerCols = belief.safeCols.filter { Zones.missileCornerColumns.contains($0) }
 
         // Best: wide (5-cell) safe col, X-pattern entirely on un-attacked cells.
-        if let pick = missileTargets(cols: safeWide, exclude: attacked, avoidFootprintHits: true).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeWide, exclude: attacked, avoidFootprintHits: true).randomElement() {
             return .tap(pick)
         }
         // Acceptable: wide safe col with un-attacked anchor.
-        if let pick = missileTargets(cols: safeWide, exclude: attacked).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeWide, exclude: attacked).randomElement() {
             return .tap(pick)
         }
         // Tolerable: wide safe col, any anchor.
-        if let pick = missileTargets(cols: safeWide, exclude: []).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeWide, exclude: []).randomElement() {
             return .tap(pick)
         }
         // Settle for corner cols only when wide cols are unavailable, keeping
         // the same overlap-avoidance ladder.
-        if let pick = missileTargets(cols: safeCornerCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeCornerCols, exclude: attacked, avoidFootprintHits: true).randomElement() {
             return .tap(pick)
         }
-        if let pick = missileTargets(cols: safeCornerCols, exclude: attacked).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeCornerCols, exclude: attacked).randomElement() {
             return .tap(pick)
         }
-        if let pick = missileTargets(cols: safeCornerCols, exclude: []).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: safeCornerCols, exclude: []).randomElement() {
             return .tap(pick)
         }
         // Last-resort fallback: any legal anchor regardless of safety, still
         // preferring wide columns over corners.
         let allWide = Array(Self.wideMissileColumns)
-        if let pick = missileTargets(cols: allWide, exclude: []).randomElement() {
+        if let pick = missileTargets(board: state.board, cols: allWide, exclude: []).randomElement() {
             return .tap(pick)
         }
         let anyCols = Array(Zones.missileTargetColumns)
-        return missileTargets(cols: anyCols, exclude: []).randomElement().map { .tap($0) }
+        return missileTargets(board: state.board, cols: anyCols, exclude: []).randomElement().map { .tap($0) }
     }
 
     /// Bomber anchor candidates. `exclude` removes the anchor cells themselves
@@ -410,6 +422,7 @@ struct SmartOpponent: OpponentPolicy {
     /// 3-drop column intersects the exclude set, so the salvo never lands a
     /// drop on a cell that has already been resolved.
     private func bombingTargets(
+        board: Board,
         cols: [Int],
         exclude: Set<GridPosition>,
         avoidFootprintHits: Bool = false
@@ -421,8 +434,11 @@ struct SmartOpponent: OpponentPolicy {
             for col in cols {
                 let p = GridPosition(row, col)
                 if exclude.contains(p) { continue }
+                let footprint = Rules.bombingPositions(target: p, attacker: .opponent)
+                if !GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: board, footprint: footprint) {
+                    continue
+                }
                 if avoidFootprintHits {
-                    let footprint = Rules.bombingPositions(target: p, attacker: .opponent)
                     if footprint.contains(where: { exclude.contains($0) }) { continue }
                 }
                 result.append(p)
@@ -435,6 +451,7 @@ struct SmartOpponent: OpponentPolicy {
     /// as `bombingTargets`, but the footprint check uses the X-pattern instead
     /// of the 3-drop column.
     private func missileTargets(
+        board: Board,
         cols: [Int],
         exclude: Set<GridPosition>,
         avoidFootprintHits: Bool = false
@@ -443,10 +460,13 @@ struct SmartOpponent: OpponentPolicy {
         for row in Zones.missileTargetRows(attacker: .opponent) {
             for col in cols {
                 let p = GridPosition(row, col)
-                if Self.isWastedOpponentMissileAnchor(p) { continue }
+                if Zones.isWastedOpponentMissileAnchor(p) { continue }
                 if exclude.contains(p) { continue }
+                let footprint = Rules.missilePositions(anchor: p, attacker: .opponent)
+                if !GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: board, footprint: footprint) {
+                    continue
+                }
                 if avoidFootprintHits {
-                    let footprint = Rules.missilePositions(anchor: p, attacker: .opponent)
                     if footprint.contains(where: { exclude.contains($0) }) { continue }
                 }
                 result.append(p)

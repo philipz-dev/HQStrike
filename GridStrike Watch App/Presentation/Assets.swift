@@ -42,6 +42,10 @@ enum Assets {
     static let manualMenuMissile = Image("ManualMenuMissile")
     static let manualMenuBomber = Image("ManualMenuBomber")
     static let manualMenuCoastguard = Image("ManualMenuCoastguard")
+    /// Tactical main-menu START ASSAULT — grenade art (opaque asset on black matte).
+    static let startAssaultGrenade = Image("StartAssaultGrenade")
+    /// Tactical main-menu FIELD GUIDE — open book with chevron bookmark.
+    static let mainMenuFieldGuide = Image("MainMenuFieldGuide")
 
     static func tileImage(for background: TileBackground, at position: GridPosition) -> Image {
         switch background {

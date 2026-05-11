@@ -147,6 +147,7 @@ struct BoardView: View {
                     }
                     .scrollIndicators(.hidden)
                     .scrollContentBackground(.hidden)
+                    .scrollDisabled(!store.state.allowsPlayfieldScrolling)
                     // Keep scroll content flush with the viewport edges so OS-default
                     // scroll margins don’t shift visuals vs hit-testing coordinates.
                     .contentMargins(0, for: .scrollContent)

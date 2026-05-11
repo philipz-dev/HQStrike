@@ -31,7 +31,7 @@ enum Action: Equatable {
     /// current layout. Spawns the AI's units and transitions to play.
     case confirmSetup
     case newGame
-    /// Reset to welcome after the post-game opponent map; shows Start game / Guide directly.
+    /// Reset to welcome after the post-game opponent map; opens the tactical menu (skip splash).
     case finishPostGameMapReview
     /// Internal — `WelcomeView` clears `welcomePresentStartMenu` after applying it.
     case clearWelcomeStartMenuRequest

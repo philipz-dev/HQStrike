@@ -6,7 +6,7 @@
 
 //  Scripted trailer: hand → bomber tile → scroll to enemy; tap → pauses → scroll so rows 5–6 sit on the bottom edge → bomber flies while board scrolls to top;
 
-//  impacts (miss / miss / hit on the upper tile) fire as the plane passes each row — tap anywhere to dismiss.
+//  impacts (miss / miss / hit on the upper tile) fire as the plane passes each row — dismiss with the top-left ✕ when the trailer ends.
 
 //
 
@@ -401,17 +401,7 @@ struct Demo_Bomber: View {
 
 
 
-                // Top layer: dismiss on tap anywhere (tiles/hand/banner pass hits through).
 
-                Color.clear
-
-                    .contentShape(Rectangle())
-
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    .onTapGesture { onClose() }
-
-                    .accessibilityLabel("Dismiss bomber demo")
 
             }
 

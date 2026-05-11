@@ -24,5 +24,41 @@ enum GridStrikeDebug {
     /// same as round start (**default**); **false** = terrain-only in rows **0…5** on that
     /// screen for fog-style UI testing (player half still drawn from snapshot).
     static var showAllEnemyObjectsOnPostGameMap = true
+
+    /// When **true**, after setup confirm every column on the player coastguard row (**8**)
+    /// gets a `.coastguard` mark (stress-test visuals / interception). Normal play uses
+    /// a single cruiser — `Board.coastguardColumn(of: .player)` only reports the first match.
+    static var fillRow8WithPlayerCoastguards = true
+
+    /// When **true**, the computer never picks strikes whose footprint includes a tile that
+    /// currently has a **player** `.coastguard` (grenade tap, bomber column, missile X).
+    static var opponentNeverAttacksPlayerCoastguardTiles = true
+
+    /// When **true**, the opponent prioritises tapping a **bomber** or **missile** launcher
+    /// on its idle turn before grenades or grass hunts (`SmartOpponent` + `RandomOpponent`).
+    static var computerUsesBomberAndMissilesFirst = true
 }
 #endif
+
+/// Release-safe wrapper so opponent code can call one API without `#if DEBUG` at every site.
+enum GridStrikeOpponentDebugStrikeFilter {
+    /// **false** iff debug mode asks the AI to avoid player coastguard tiles *and* at least
+    /// one cell in `cells` currently hosts `Unit.coastguard` on the live board.
+    static func opponentMayStrike(board: Board, footprint cells: [GridPosition]) -> Bool {
+        #if DEBUG
+        guard GridStrikeDebug.opponentNeverAttacksPlayerCoastguardTiles else { return true }
+        return !cells.contains { board.unit(at: $0) == .coastguard }
+        #else
+        return true
+        #endif
+    }
+
+    /// When **true** (DEBUG only), opponent idle turns try bomber/missile taps before grenades.
+    static var prefersBomberAndMissileFirst: Bool {
+        #if DEBUG
+        return GridStrikeDebug.computerUsesBomberAndMissilesFirst
+        #else
+        return false
+        #endif
+    }
+}

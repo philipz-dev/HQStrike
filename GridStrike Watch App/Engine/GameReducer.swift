@@ -170,6 +170,14 @@ enum GameReducer {
             // which used to fire automatically on coastguard placement.
             if case .setupConfirm = s.phase {
                 EnemySpawner.apply(board: &s.board, rng: &rng)
+#if DEBUG
+                if GridStrikeDebug.fillRow8WithPlayerCoastguards {
+                    for col in Zones.allColumns {
+                        let p = GridPosition(Zones.coastguardPlayerRow, col)
+                        s.board.marks[p] = .coastguard
+                    }
+                }
+#endif
                 s.boardAtPlayStart = s.board
                 s.phase = .play(.idle)
                 s.currentTurn = .player

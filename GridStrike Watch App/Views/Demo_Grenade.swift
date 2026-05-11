@@ -157,11 +157,6 @@ struct Demo_Grenade: View {
                         .allowsHitTesting(false)
                 }
 
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onTapGesture { onClose() }
-                    .accessibilityLabel("Dismiss grenade demo")
             }
             .overlay(alignment: .topLeading) {
                 DemoTopCloseButton(

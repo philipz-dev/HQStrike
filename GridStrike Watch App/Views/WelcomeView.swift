@@ -2,24 +2,21 @@
 //  WelcomeView.swift
 //  GridStrike Watch App
 //
-//  First screen: splash artwork. Tapping anywhere reveals a small in-place menu —
-//  "Start game" (begins setup) and "Guide" (weapon picker on camouflage, then manual inline).
-//
-//  The guide hub is presented inline (not via `.fullScreenCover`) so the OS doesn't
-//  layer system close chrome on top of our own X. That X returns to the Start / Guide menu.
-//  Each weapon tile opens its scripted demo; a tap during a demo dismisses back to this
-//  four-tile camouflage hub (not the splash).
+//  (1) Splash: `SplashBackground` + two-line “Welcome to” / “GridStrike!” — tap anywhere to continue.
+//  (2) Tactical menu: full-screen camo + two-line “START / ASSAULT!” and “FIELD / GUIDE” beside icons.
+//  Guide opens `ManualWeaponsMenuView` inline; weapon demos return to the camouflage hub.
 //
 
 import SwiftUI
 
 struct WelcomeView: View {
-    /// Vertical nudge for the Start / Guide stack (~`.subheadline` line height on watch).
-    private static let startMenuFontLineHeight: CGFloat = 20
+    /// Pushes the welcome title toward the chin: twice the old SF Symbol block (44 + 12) + 20.
+    private static let splashWelcomeExtraTopInset: CGFloat = (44 + 12) * 2 + 50
 
     @Environment(GameStore.self) private var store
+    /// After step (1); when true, shows the camo tactical menu (step 2).
+    @State private var showTacticalMenu = false
     @State private var showManualWeaponsMenu = false
-    @State private var showStartMenu = false
     @State private var showMissileDemo = false
     @State private var showCoastguardDemo = false
     @State private var showBomberDemo = false
@@ -39,7 +36,6 @@ struct WelcomeView: View {
                 ManualWeaponsMenuView(
                     onBack: {
                         showManualWeaponsMenu = false
-                        showStartMenu = true
                     },
                     onSelect: { selection in
                         showManualWeaponsMenu = false
@@ -56,18 +52,24 @@ struct WelcomeView: View {
                     }
                 )
             } else {
-                splashContent
+                Group {
+                    if showTacticalMenu {
+                        mainMenuContent
+                    } else {
+                        splashContent
+                    }
+                }
             }
         }
         .onAppear {
             if store.state.welcomePresentStartMenu {
-                showStartMenu = true
+                showTacticalMenu = true
                 store.send(.clearWelcomeStartMenuRequest)
             }
         }
     }
 
-    // MARK: - Splash
+    // MARK: - Splash (first screen)
 
     private var splashContent: some View {
         ZStack {
@@ -79,73 +81,67 @@ struct WelcomeView: View {
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
-            // Tap-anywhere surface — first tap reveals the start menu.
-            // Once the menu is up, taps inside the menu's buttons take
-            // precedence; taps outside dismiss the menu (handled by the
-            // menu overlay's own background).
             Color.clear
                 .contentShape(Rectangle())
-                .onTapGesture { showStartMenu = true }
+                .onTapGesture { showTacticalMenu = true }
 
-            VStack {
+            VStack(spacing: 0) {
                 Spacer()
-                OutlinedText(
-                    "Welcome to GridStrike!",
-                    font: .headline.weight(.bold)
-                )
-                .multilineTextAlignment(.center)
+                // Former splash: 44pt SF Symbol + 12pt gap above the title; title is offset
+                // down by twice that block so it sits lower on the watch face.
+                // Two separate outlined labels — multiline `Text` inside `OutlinedText`’s
+                // ZStack mis-measures on watchOS and can hide the second line.
+                VStack(spacing: 6) {
+                    OutlinedText("Welcome to", font: .headline.weight(.bold))
+                    OutlinedText("GridStrike!", font: .headline.weight(.bold))
+                }
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 12)
-                .padding(.bottom, 8)
+                .padding(.top, Self.splashWelcomeExtraTopInset)
+                Spacer()
+                    .frame(height: 24)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .allowsHitTesting(false)
         }
-        .overlay {
-            if showStartMenu {
-                startMenuOverlay
-            }
-        }
     }
 
-    /// Two-button choice screen revealed by the first tap on the splash.
-    /// Background is fully opaque so the splash artwork is hidden — the menu
-    /// reads as its own dedicated screen rather than a translucent overlay.
-    private var startMenuOverlay: some View {
+    // MARK: - Main menu (camo + tactical buttons)
+
+    private var mainMenuContent: some View {
         ZStack {
-            Color.black
+            Assets.manualMenuCamouflage
+                .resizable()
+                .scaledToFill()
+                .frame(minWidth: 0, minHeight: 0)
+                .clipped()
                 .ignoresSafeArea()
-                .contentShape(Rectangle())
-                // Tap outside the buttons returns to the splash. The buttons
-                // sit on top of this layer so their hits don't fall through.
-                .onTapGesture { showStartMenu = false }
+                .allowsHitTesting(false)
 
-            VStack(spacing: 10) {
-                Button {
-                    showStartMenu = false
+            VStack(spacing: 12) {
+                TacticalMainMenuButton(
+                    line1: "START",
+                    line2: "ASSAULT!",
+                    innerFill: MainMenuStyle.startAssaultFill,
+                    icon: .grenade
+                ) {
                     store.send(.dismissWelcome)
-                } label: {
-                    Text("Start game")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(EndGamePalette.mutedGreen)
+                .accessibilityLabel("Start game")
 
-                Button {
-                    showStartMenu = false
+                TacticalMainMenuButton(
+                    line1: "FIELD",
+                    line2: "GUIDE",
+                    innerFill: MainMenuStyle.darkCharcoal,
+                    icon: .fieldGuide
+                ) {
                     showManualWeaponsMenu = true
-                } label: {
-                    Text("Guide")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(EndGamePalette.mutedGray)
+                .accessibilityLabel("Guide")
             }
-            .padding(.horizontal, 14)
-            .offset(y: -Self.startMenuFontLineHeight)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .transition(.opacity)
     }
 
     /// Ends any active scripted demo and shows the camouflage weapon hub again.
@@ -158,4 +154,172 @@ struct WelcomeView: View {
     }
 }
 
-// `OutlinedText` lives in its own file (`OutlinedText.swift`) for reuse on the splash and elsewhere.
+// MARK: - Styling
+
+private enum MainMenuStyle {
+    /// Olive fill for START ASSAULT (asset corners are black; keep a readable green pill).
+    static let startAssaultFill = Color(red: 58 / 255, green: 66 / 255, blue: 31 / 255)
+    static let darkCharcoal = Color(red: 0.20, green: 0.21, blue: 0.23)
+    /// Label copy on tactical buttons — larger than chrome padding so text dominates without growing the capsule much.
+    static let tacticalTitleFont = Font.system(size: 15, weight: .heavy, design: .default)
+}
+
+// MARK: - Tactical button
+
+private struct TacticalLabelHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct TacticalMainMenuButton: View {
+    enum IconKind {
+        case grenade
+        case fieldGuide
+    }
+
+    /// Matches `.padding(.vertical, 9)` on the inner row — icon square matches full label band height.
+    private static let innerVerticalPaddingTotal: CGFloat = 18
+
+    let line1: String
+    let line2: String
+    let innerFill: Color
+    let icon: IconKind
+    let action: () -> Void
+
+    @State private var labelStackHeight: CGFloat = 0
+
+    var body: some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 8) {
+                iconSlot
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(line1)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Text(line2)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                .font(MainMenuStyle.tacticalTitleFont)
+                .foregroundStyle(.white)
+                .textCase(.uppercase)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .shadow(color: .black.opacity(0.35), radius: 0, y: 1)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: TacticalLabelHeightPreferenceKey.self,
+                            value: proxy.size.height
+                        )
+                    }
+                )
+            }
+            .onPreferenceChange(TacticalLabelHeightPreferenceKey.self) { labelStackHeight = $0 }
+            .padding(.leading, 10)
+            .padding(.trailing, 8)
+            .padding(.vertical, 9)
+            .background(innerFill)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.black.opacity(0.42), lineWidth: 1)
+            )
+            .padding(4)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.52, green: 0.52, blue: 0.55),
+                                Color(red: 0.28, green: 0.28, blue: 0.30),
+                                Color(red: 0.42, green: 0.42, blue: 0.44)
+                            ],
+                            startPoint: UnitPoint(x: 0.15, y: 0),
+                            endPoint: UnitPoint(x: 0.85, y: 1)
+                        )
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.42),
+                                Color.white.opacity(0.06)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+                    .padding(2)
+            )
+            .overlay(rivetStrip)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Icon height matches the two-line label stack + inner vertical padding (`.padding(.vertical, 9)` × 2).
+    private var iconSlot: some View {
+        Group {
+            switch icon {
+            case .grenade:
+                Assets.startAssaultGrenade
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: tacticalIconSide, height: tacticalIconSide)
+                    .accessibilityHidden(true)
+            case .fieldGuide:
+                Assets.mainMenuFieldGuide
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: tacticalIconSide, height: tacticalIconSide)
+                    .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private var tacticalIconSide: CGFloat {
+        let fallback: CGFloat = 48
+        guard labelStackHeight > 0 else { return fallback }
+        let raw = labelStackHeight + Self.innerVerticalPaddingTotal
+        return max(raw, 44)
+    }
+
+    /// Small rivet bumps along the outer metallic bezel.
+    private var rivetStrip: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let rivet = Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [Color(white: 0.35), Color(white: 0.12)],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 3
+                    )
+                )
+                .frame(width: 4, height: 4)
+                .overlay(Circle().stroke(Color.black.opacity(0.5), lineWidth: 0.5))
+
+            ZStack {
+                rivet.position(x: w * 0.12, y: h * 0.5)
+                rivet.position(x: w * 0.28, y: h * 0.12)
+                rivet.position(x: w * 0.50, y: h * 0.08)
+                rivet.position(x: w * 0.72, y: h * 0.12)
+                rivet.position(x: w * 0.88, y: h * 0.5)
+                rivet.position(x: w * 0.72, y: h * 0.88)
+                rivet.position(x: w * 0.50, y: h * 0.92)
+                rivet.position(x: w * 0.28, y: h * 0.88)
+            }
+        }
+        .allowsHitTesting(false)
+    }
+}

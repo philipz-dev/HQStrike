@@ -36,6 +36,13 @@ struct RandomOpponent: OpponentPolicy {
     // MARK: - First tap of the turn
 
     private func pickWeaponLaunch(state: GameState) -> Action? {
+        if GridStrikeOpponentDebugStrikeFilter.prefersBomberAndMissileFirst {
+            if let pos = ownUnits(state: state, of: .bomber).randomElement() { return .tap(pos) }
+            if let pos = ownUnits(state: state, of: .missile).randomElement() { return .tap(pos) }
+            if let pos = grenadeCandidates(state: state).randomElement() { return .tap(pos) }
+            return nil
+        }
+
         var options: [Action] = []
 
         // Tap one of our remaining bombers to start a column attack.
@@ -62,7 +69,12 @@ struct RandomOpponent: OpponentPolicy {
         // drops off the back of the board (rows 12, 13 for the opponent).
         for row in Zones.safeBombingTargetRows(attacker: .opponent) {
             for col in Zones.allColumns {
-                candidates.append(GridPosition(row, col))
+                let p = GridPosition(row, col)
+                let footprint = Rules.bombingPositions(target: p, attacker: .opponent)
+                guard GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: state.board, footprint: footprint) else {
+                    continue
+                }
+                candidates.append(p)
             }
         }
         return candidates.randomElement().map { .tap($0) }
@@ -72,7 +84,13 @@ struct RandomOpponent: OpponentPolicy {
         var candidates: [GridPosition] = []
         for row in Zones.missileTargetRows(attacker: .opponent) {
             for col in Zones.missileTargetColumns {
-                candidates.append(GridPosition(row, col))
+                let p = GridPosition(row, col)
+                if Zones.isWastedOpponentMissileAnchor(p) { continue }
+                let footprint = Rules.missilePositions(anchor: p, attacker: .opponent)
+                guard GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: state.board, footprint: footprint) else {
+                    continue
+                }
+                candidates.append(p)
             }
         }
         return candidates.randomElement().map { .tap($0) }
@@ -96,9 +114,11 @@ struct RandomOpponent: OpponentPolicy {
         for row in Zones.grenadeTargetRows(attacker: .opponent) {
             for col in Zones.allColumns {
                 let p = GridPosition(row, col)
-                if state.grenadeStrikes[.player][p] == nil {
-                    result.append(p)
+                guard state.grenadeStrikes[.player][p] == nil else { continue }
+                guard GridStrikeOpponentDebugStrikeFilter.opponentMayStrike(board: state.board, footprint: [p]) else {
+                    continue
                 }
+                result.append(p)
             }
         }
         return result

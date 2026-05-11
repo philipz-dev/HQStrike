@@ -201,11 +201,6 @@ struct Demo_Missile: View {
                     }
                 }
 
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onTapGesture { onClose() }
-                    .accessibilityLabel("Dismiss missile demo")
             }
             .overlay(alignment: .topLeading) {
                 DemoTopCloseButton(

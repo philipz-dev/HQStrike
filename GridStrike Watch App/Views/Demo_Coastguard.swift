@@ -257,11 +257,6 @@ struct Demo_Coastguard: View {
                     }
                 }
 
-                Color.clear
-                    .contentShape(Rectangle())
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .onTapGesture { onClose() }
-                    .accessibilityLabel("Dismiss coastguard demo")
             }
             .overlay(alignment: .topLeading) {
                 DemoTopCloseButton(
