@@ -462,6 +462,7 @@ struct Demo_Missile: View {
                     northStrikeOverlay: nil,
                     dropOverlay: missileImpactOverlays[pos],
                     dropOverlayScale: 1,
+                    missileHitPulseToken: nil,
                     waterWreck: nil,
                     wreckRotationDegrees: 0,
                     border: .plain,

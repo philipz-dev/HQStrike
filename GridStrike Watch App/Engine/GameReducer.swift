@@ -61,6 +61,20 @@ enum GameReducer {
             s.welcomePresentStartMenu = false
             return (s, [])
 
+        case .finalizePlayerMissileIntercept:
+            if case .play(.missileInterceptFlight(let source, let anchor)) = s.phase {
+                commitPlayerMissileIntercept(state: &s, source: source, anchor: anchor, effects: &effects)
+            }
+            appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
+            return (s, effects)
+
+        case .finalizePlayerBomberIntercept:
+            if case .play(.bomberInterceptFlight(let source, let anchor)) = s.phase {
+                commitPlayerBomberIntercept(state: &s, source: source, anchor: anchor, effects: &effects)
+            }
+            appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
+            return (s, effects)
+
         case .acknowledgeDestructionAlert:
             if !s.pendingDestructionAlerts.isEmpty {
                 s.pendingDestructionAlerts.removeFirst()
@@ -85,6 +99,19 @@ enum GameReducer {
             appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
             return (s, effects)
 
+        case .commitMissileFlightStrike:
+            if case .play(.missileFlight(let source, let anchor, let attacker)) = s.phase {
+                applyMissileSalvo(
+                    state: &s,
+                    attacker: attacker,
+                    source: source,
+                    anchor: anchor,
+                    effects: &effects
+                )
+            }
+            appendOpponentSchedulingIfNeeded(state: s, effects: &effects)
+            return (s, effects)
+
         case .completeTurn:
             // Internal — fires `cooldownDuration` after an attack resolves. Lifts
             // the cooldown lock; if the latest attack killed an HQ, swap to the
@@ -93,6 +120,7 @@ enum GameReducer {
             // not terminal, hand the turn over to the other side.
             if s.isInPostAttackCooldown {
                 s.isInPostAttackCooldown = false
+                s.missileSalvoPulseHitCells = []
                 if let endPhase = s.pendingEndGamePhase {
                     s.phase = endPhase
                     s.pendingEndGamePhase = nil
@@ -228,8 +256,10 @@ enum GameReducer {
                 return
             }
             handleConfirmMissileTap(state: &s, source: src, pos: pos, effects: &effects)
-        case .bombingDrops:
-            // Drops in flight; ignore taps.
+        case .bombingDrops, .missileFlight:
+            // Drops / missile fly-over in flight; ignore taps.
+            break
+        case .missileInterceptFlight, .bomberInterceptFlight:
             break
         }
     }
@@ -329,6 +359,11 @@ enum GameReducer {
         guard Zones.isBombingTarget(pos, attacker: attacker) else { return }
 
         if Rules.bomberIntercepted(board: s.board, target: pos, attacker: attacker) {
+            if attacker == .player {
+                s.lastTurnHighlight = [pos]
+                s.phase = .play(.bomberInterceptFlight(source: source, anchor: pos))
+                return
+            }
             let wreckRow = Zones.shotDownRow(attacker: attacker)
             let wreckPos = GridPosition(wreckRow, pos.col)
             s.planeInWater[attacker] = wreckPos
@@ -497,11 +532,13 @@ enum GameReducer {
         guard Zones.isMissileTarget(pos, attacker: attacker) else { return }
 
         if Rules.missileIntercepted(board: s.board, anchor: pos, attacker: attacker) {
+            if attacker == .player {
+                s.lastTurnHighlight = [pos]
+                s.phase = .play(.missileInterceptFlight(source: source, anchor: pos))
+                return
+            }
             let wreckRow = Zones.shotDownRow(attacker: attacker)
             let defender = attacker.opposite
-            // Wreck column == defender's coastguard column. Pre-X-pattern this
-            // could differ from the anchor for the col-4 edge case; keep the
-            // explicit lookup so we don't depend on that history.
             let wreckCol = s.board.coastguardColumn(of: defender) ?? pos.col
             let wreckPos = GridPosition(wreckRow, wreckCol)
             s.missileInWater[attacker] = wreckPos
@@ -509,31 +546,115 @@ enum GameReducer {
             s.phase = .play(.shotDown(.missile, attacker: attacker))
             applyShotDownHighlight(state: &s, attacker: attacker, wreckPos: wreckPos)
             effects.append(.haptic(.notification))
-            // Hold the shoot-down banner an extra `shotDownExtraCooldown`
-            // beats so the player can read "Missile shot down by …" before
-            // the turn flips.
             startCooldown(state: &s, effects: &effects, additionalSeconds: shotDownExtraCooldown)
             return
         }
 
         if attacker == .opponent {
-            beginDeferredOpponentImpact(
-                state: &s,
-                impact: .missile(source: source, anchor: pos),
-                target: pos,
-                effects: &effects
-            )
+            beginOpponentMissileFlight(state: &s, source: source, anchor: pos, effects: &effects)
             return
         }
 
-        applyMissileSalvo(state: &s, attacker: attacker, source: source, anchor: pos, effects: &effects)
+        beginPlayerMissileFlight(state: &s, source: source, anchor: pos, effects: &effects)
+    }
+
+    /// Player missile: fly-over (`missileFlight`); full X-pattern commits at once on
+    /// `commitMissileFlightStrike`.
+    private static func beginPlayerMissileFlight(
+        state s: inout GameState,
+        source: GridPosition,
+        anchor pos: GridPosition,
+        effects: inout [SideEffect]
+    ) {
+        let attacker = Side.player
+        let drops = Rules.missileImpactApplicationOrder(anchor: pos, attacker: attacker)
+        recordAttackImpact(state: &s, attacker: attacker, cells: [pos])
+        s.inFlightBombDestructions = []
+        guard !drops.isEmpty else {
+            finalizePlayerMissileRun(state: &s, source: source, attacker: attacker, effects: &effects)
+            return
+        }
+        s.phase = .play(.missileFlight(source: source, anchor: pos, attacker: .player))
+    }
+
+    private static func beginOpponentMissileFlight(
+        state s: inout GameState,
+        source: GridPosition,
+        anchor pos: GridPosition,
+        effects: inout [SideEffect]
+    ) {
+        let attacker = Side.opponent
+        let drops = Rules.missileImpactApplicationOrder(anchor: pos, attacker: attacker)
+        recordAttackImpact(state: &s, attacker: attacker, cells: [pos])
+        s.inFlightBombDestructions = []
+        guard !drops.isEmpty else {
+            finalizePlayerMissileRun(state: &s, source: source, attacker: attacker, effects: &effects)
+            return
+        }
+        s.phase = .play(.missileFlight(source: source, anchor: pos, attacker: attacker))
+    }
+
+    private static func finalizePlayerMissileRun(
+        state s: inout GameState,
+        source: GridPosition,
+        attacker: Side,
+        effects: inout [SideEffect]
+    ) {
+        if !s.inFlightBombDestructions.isEmpty {
+            s.pendingDestructionAlerts.append(
+                DestructionAlert(attacker: attacker, units: s.inFlightBombDestructions)
+            )
+            s.inFlightBombDestructions = []
+        }
+        s.board.removeLauncher(at: source, requiring: .missile, attacker: attacker)
+        s.phase = .play(.idle)
+        startCooldown(state: &s, effects: &effects)
+    }
+
+    /// Applies coastguard missile interception after `LiveMissileInterceptFlight` finishes.
+    private static func commitPlayerMissileIntercept(
+        state s: inout GameState,
+        source: GridPosition,
+        anchor: GridPosition,
+        effects: inout [SideEffect]
+    ) {
+        let attacker = Side.player
+        let wreckRow = Zones.shotDownRow(attacker: attacker)
+        let defender = attacker.opposite
+        let wreckCol = s.board.coastguardColumn(of: defender) ?? anchor.col
+        let wreckPos = GridPosition(wreckRow, wreckCol)
+        s.missileInWater[attacker] = wreckPos
+        s.board.removeLauncher(at: source, requiring: .missile, attacker: attacker)
+        s.phase = .play(.shotDown(.missile, attacker: attacker))
+        applyShotDownHighlight(state: &s, attacker: attacker, wreckPos: wreckPos)
+        effects.append(.haptic(.notification))
+        startCooldown(state: &s, effects: &effects, additionalSeconds: shotDownExtraCooldown)
+    }
+
+    /// Applies coastguard bomber interception after the same trailer as `LiveMissileInterceptFlight`.
+    private static func commitPlayerBomberIntercept(
+        state s: inout GameState,
+        source: GridPosition,
+        anchor: GridPosition,
+        effects: inout [SideEffect]
+    ) {
+        let attacker = Side.player
+        let wreckRow = Zones.shotDownRow(attacker: attacker)
+        let defender = attacker.opposite
+        let wreckCol = s.board.coastguardColumn(of: defender) ?? anchor.col
+        let wreckPos = GridPosition(wreckRow, wreckCol)
+        s.planeInWater[attacker] = wreckPos
+        s.board.removeLauncher(at: source, requiring: .bomber, attacker: attacker)
+        s.phase = .play(.shotDown(.bomber, attacker: attacker))
+        applyShotDownHighlight(state: &s, attacker: attacker, wreckPos: wreckPos)
+        effects.append(.haptic(.notification))
+        startCooldown(state: &s, effects: &effects, additionalSeconds: shotDownExtraCooldown)
     }
 
     /// Commits the full missile X-pattern: writes hit/miss overlays, removes a
     /// destroyed coastguard from the board, retires the launcher tile, and
-    /// kicks off the post-attack cooldown. Used immediately for player
-    /// missiles; via `Action.applyOpponentImpact` for AI missiles after the
-    /// camera reaches the anchor.
+    /// kicks off the post-attack cooldown. Used when `commitMissileFlightStrike` runs after the
+    /// fly-over animation (player or opponent).
     private static func applyMissileSalvo(
         state s: inout GameState,
         attacker: Side,
@@ -541,38 +662,46 @@ enum GameReducer {
         anchor pos: GridPosition,
         effects: inout [SideEffect]
     ) {
-        let defender = attacker.opposite
-        let cells = Rules.missilePositions(anchor: pos, attacker: attacker)
+        let cells = Rules.missileImpactApplicationOrder(anchor: pos, attacker: attacker)
         recordAttackImpact(state: &s, attacker: attacker, cells: cells)
-        // Collect everything destroyed by this salvo locally so we can queue
-        // a single aggregated alert ("2 missiles and bomber destroyed!")
-        // instead of stacking up to five separate modals.
-        var destroyedThisSalvo: [Unit] = []
+        s.inFlightBombDestructions = []
+        var pulseHits = Set<GridPosition>()
         for c in cells {
-            if let unit = s.board.unit(at: c) {
-                s.missileOverlays[defender][c] = .hit
-                destroyedThisSalvo.append(unit)
-                // Every hit unit leaves the board so a "destroyed" launcher
-                // can't be tapped/fired again, and the CG column stops
-                // intercepting once its cruiser is gone. HQ removal is safe
-                // because the end-game phase is queued in the same step.
-                s.board.marks.removeValue(forKey: c)
-                if unit == .headquarters {
-                    s.pendingEndGamePhase = endGamePhase(forAttacker: attacker)
-                }
-            } else {
-                s.missileOverlays[defender][c] = .miss
-            }
+            let hadUnit = s.board.unit(at: c) != nil
+            applyMissileDropAtCell(state: &s, position: c, attacker: attacker)
+            if hadUnit { pulseHits.insert(c) }
         }
-        if !destroyedThisSalvo.isEmpty {
+        s.missileImpactPulseGeneration &+= 1
+        s.missileSalvoPulseHitCells = pulseHits
+        if !s.inFlightBombDestructions.isEmpty {
             s.pendingDestructionAlerts.append(
-                DestructionAlert(attacker: attacker, units: destroyedThisSalvo)
+                DestructionAlert(attacker: attacker, units: s.inFlightBombDestructions)
             )
+            s.inFlightBombDestructions = []
         }
         effects.append(.haptic(.notification))
         s.board.removeLauncher(at: source, requiring: .missile, attacker: attacker)
         s.phase = .play(.idle)
         startCooldown(state: &s, effects: &effects)
+    }
+
+    /// One cell of an X-pattern salvo — shared by `applyMissileSalvo` / `commitMissileFlightStrike`.
+    private static func applyMissileDropAtCell(
+        state s: inout GameState,
+        position: GridPosition,
+        attacker: Side
+    ) {
+        let defender = attacker.opposite
+        if let unit = s.board.unit(at: position) {
+            s.missileOverlays[defender][position] = .hit
+            s.inFlightBombDestructions.append(unit)
+            s.board.marks.removeValue(forKey: position)
+            if unit == .headquarters {
+                s.pendingEndGamePhase = endGamePhase(forAttacker: attacker)
+            }
+        } else {
+            s.missileOverlays[defender][position] = .miss
+        }
     }
 
     // MARK: - Turn management
@@ -693,14 +822,6 @@ enum GameReducer {
                 target: target,
                 effects: &effects
             )
-        case .missile(let source, let anchor):
-            applyMissileSalvo(
-                state: &s,
-                attacker: .opponent,
-                source: source,
-                anchor: anchor,
-                effects: &effects
-            )
         }
     }
 
@@ -736,6 +857,10 @@ enum GameReducer {
         switch play {
         case .bombingDrops:
             return                                     // advanceBombDrop drives this
+        case .missileFlight:
+            return                                     // `commitMissileFlightStrike` ends flight
+        case .missileInterceptFlight, .bomberInterceptFlight:
+            return                                     // player intercept trailer
         case .shotDown:
             delay = opponentPostShotDownDelay
         case .choosingBombTarget, .choosingMissileTarget:

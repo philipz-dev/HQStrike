@@ -14,6 +14,9 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    /// Vertical nudge for the Start / Guide stack (~`.subheadline` line height on watch).
+    private static let startMenuFontLineHeight: CGFloat = 20
+
     @Environment(GameStore.self) private var store
     @State private var showManualWeaponsMenu = false
     @State private var showStartMenu = false
@@ -140,6 +143,7 @@ struct WelcomeView: View {
                 .tint(EndGamePalette.mutedGray)
             }
             .padding(.horizontal, 14)
+            .offset(y: -Self.startMenuFontLineHeight)
         }
         .transition(.opacity)
     }

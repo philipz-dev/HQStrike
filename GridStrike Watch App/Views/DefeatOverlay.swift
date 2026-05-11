@@ -3,14 +3,17 @@
 //  GridStrike Watch App
 //
 //  Mirror of VictoryOverlay for the lose path. Title and subtitle sit toward the
-//  bottom; the top-left × matches `OpponentSetupMapView` and advances to the
-//  round-start map.
+//  bottom; tap anywhere to advance to the round-start map. After 5 seconds without
+//  a tap, “Tap to continue” appears centered on the vertical axis.
 //
 
 import SwiftUI
 
 struct DefeatOverlay: View {
     let onContinue: () -> Void
+
+    @State private var showTapHint = false
+    @State private var tapHintTask: Task<Void, Never>?
 
     var body: some View {
         ZStack {
@@ -42,16 +45,49 @@ struct DefeatOverlay: View {
                     .padding(.horizontal, 10)
                     .padding(.top, 4)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 14)
+
+                Spacer()
+                    .frame(height: 14)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            if showTapHint {
+                VStack {
+                    Spacer()
+                    Text("Tap to continue")
+                        .font(.subheadline.weight(.medium))
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(.white.opacity(0.92))
+                        .shadow(color: .black.opacity(0.85), radius: 3, y: 1)
+                        .padding(.horizontal, 10)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+            }
         }
-        .overlay(alignment: .topLeading) {
-            PostGameCircularDismissButton(
-                accessibilityLabel: "Continue to opponent starting positions",
-                action: onContinue
-            )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            tapHintTask?.cancel()
+            tapHintTask = nil
+            onContinue()
+        }
+        .onAppear {
+            showTapHint = false
+            tapHintTask?.cancel()
+            tapHintTask = Task { @MainActor in
+                try? await Task.sleep(for: .seconds(5))
+                guard !Task.isCancelled else { return }
+                showTapHint = true
+            }
+        }
+        .onDisappear {
+            tapHintTask?.cancel()
+            tapHintTask = nil
         }
         .allowsHitTesting(true)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Defeat")
+        .accessibilityHint("Tap anywhere to continue.")
     }
 }

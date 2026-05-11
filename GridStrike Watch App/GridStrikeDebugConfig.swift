@@ -17,7 +17,7 @@ enum GridStrikeDebug {
 
     /// When **true**, every opponent placement on rows **0…5** is drawn on the live
     /// battlefield during play (“full cheat sheet”).
-    static var showAllEnemyPiecesOnPlayfield = false
+    static var showAllEnemyPiecesOnPlayfield = true
     
 
     /// Frozen post-game map: **true** = draw opponent unit sprites north of the narrows,

@@ -25,14 +25,27 @@ struct ManualWeaponsMenuView: View {
     private static let targetIconSize: CGFloat = 128
 
     private static let cellCornerRadius: CGFloat = 18
-    private static let gridSpacing: CGFloat = 8
+    /// Gap between cells (both axes). Kept tight on purpose: with the
+    /// previous `8`, the slot-fit icons (~+20% target) overflowed the
+    /// bottom of the watch screen. Trimming the gap reclaims that
+    /// vertical room so two rows fit without an explicit scale factor.
+    private static let gridSpacing: CGFloat = 3
 
-    private static let cellPadding: CGFloat = 5
+    /// Inner padding inside each weapon cell. Reduced from `5` for the
+    /// same reason as `gridSpacing` — frees vertical room so the icon
+    /// (sized off `heightSlot`) doesn't push past the bottom safe area.
+    private static let cellPadding: CGFloat = 2
 
     /// Title between the × row and weapon tiles.
     private static let guideTitleTopPadding: CGFloat = 4
     /// Matches the gradient band height used for Guide title layout reserve.
     private static let guideTitleBlockHeight: CGFloat = 34
+
+    /// Same size as `Text("Guide")` below — used to nudge title + grid upward so they clear the bottom bezel.
+    private static let guideTitleFontSize: CGFloat = 18
+
+    /// Approximate line height for `Text("Guide")` at `guideTitleFontSize` on watch.
+    private static let guideTitleFontLineHeight: CGFloat = 22
 
     /// Space below the Guide title before the 2×2 grid.
     private static let gridTopInsetBelowTopBar: CGFloat = 8
@@ -87,23 +100,26 @@ struct ManualWeaponsMenuView: View {
                         .padding(.top, geo.safeAreaInsets.top)
                         .padding(.horizontal, 8)
 
-                    ZStack {
-                        Self.guideTitleGradient
-                            .frame(maxWidth: .infinity)
-                            .frame(height: Self.guideTitleGradientHeight)
+                    VStack(spacing: 0) {
+                        ZStack {
+                            Self.guideTitleGradient
+                                .frame(maxWidth: .infinity)
+                                .frame(height: Self.guideTitleGradientHeight)
 
-                        Text("Guide")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
+                            Text("Guide")
+                                .font(.system(size: Self.guideTitleFontSize, weight: .bold, design: .rounded))
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.55), radius: 2, y: 1)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, Self.guideTitleTopPadding)
+
+                        grid(iconSide: iconSide)
+                            .frame(width: geo.size.width * 0.94)
+                            .padding(.top, Self.gridTopInsetBelowTopBar)
+                            .offset(x: Self.gridNudgeX)
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, Self.guideTitleTopPadding)
-
-                    grid(iconSide: iconSide)
-                        .frame(width: geo.size.width * 0.94)
-                        .padding(.top, Self.gridTopInsetBelowTopBar)
-                        .offset(x: Self.gridNudgeX)
+                    .offset(y: -Self.guideTitleFontLineHeight)
 
                     Spacer(minLength: 0)
                 }

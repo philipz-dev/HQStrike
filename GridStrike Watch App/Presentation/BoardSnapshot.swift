@@ -136,6 +136,13 @@ struct BoardSnapshot: Equatable {
             isSelected: isSelected
         )
 
+        let missileHitPulseToken: UInt32? = {
+            guard let side = Zones.side(forRow: pos.row) else { return nil }
+            guard state.missileSalvoPulseHitCells.contains(pos) else { return nil }
+            guard state.missileOverlays[side][pos] == .hit else { return nil }
+            return state.missileImpactPulseGeneration
+        }()
+
         return TileRenderModel(
             position: pos,
             background: background,
@@ -145,6 +152,7 @@ struct BoardSnapshot: Equatable {
             northStrikeOverlay: strikeOverlay,
             dropOverlay: dropOverlay,
             dropOverlayScale: 1,
+            missileHitPulseToken: missileHitPulseToken,
             waterWreck: wreck,
             wreckRotationDegrees: wreckRotation,
             border: border,
@@ -281,7 +289,9 @@ struct BoardSnapshot: Equatable {
                 return !(Zones.isMissileTarget(pos) || isSelected)
             case .choosingBombTarget:
                 return !(Zones.isBombingTarget(pos) || isSelected)
-            case .bombingDrops:
+            case .bombingDrops, .missileFlight:
+                return true
+            case .missileInterceptFlight, .bomberInterceptFlight:
                 return true
             case .idle, .shotDown:
                 return false

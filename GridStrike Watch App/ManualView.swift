@@ -265,6 +265,7 @@ struct ManualView: View {
             northStrikeOverlay: nil,
             dropOverlay: nil,
             dropOverlayScale: 1,
+            missileHitPulseToken: nil,
             waterWreck: nil,
             wreckRotationDegrees: 0,
             border: .plain,

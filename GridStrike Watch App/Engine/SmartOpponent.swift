@@ -8,8 +8,10 @@
 //  `board.marks`. The strategy in three beats:
 //
 //  1. SCOUT — until the player's coastguard column is known (or the coastguard is
-//     destroyed), the AI mostly fires grenades at row 8. Each grenade either kills
-//     the CG outright (a `.hit`) or rules out one column (a `.miss`).
+//     destroyed), the AI probes row 8. Each grenade either kills the CG (`.hit`)
+//     or rules out a column (`.miss`). Once at least one column has missed — i.e.
+//     we know that column cannot host the coastguard — we **prefer missile/bomber**
+//     launches down those safe columns instead of endlessly grenading row 8.
 //  2. PRESS — once the CG's status is resolved, the AI mostly launches missiles
 //     and bombers, preferring columns it has confirmed are safe so it can't be
 //     intercepted.
@@ -23,15 +25,24 @@
 import Foundation
 
 struct SmartOpponent: OpponentPolicy {
-    /// Missile anchor columns where the full 5-cell X-pattern lands inside the
-    /// player's half. Anchoring on column 0 or 4 only delivers 3 cells (the two
-    /// off-board diagonals are dropped), so the AI avoids the corners except as
-    /// a deliberate, low-probability variation or when no wide column is safe.
+    /// Missile anchors in columns **1…3** keep all five X-pattern cells on-board;
+    /// columns **0** and **4** drop two side diagonals, and **row 13** drops southern
+    /// diagonals — `missileTargets` filters those anchors out so the AI never wastes
+    /// salvo cells off the field (see `isWastedOpponentMissileAnchor`).
     private static let wideMissileColumns: ClosedRange<Int> = 1...3
     /// Probability of intentionally anchoring a missile in a corner column even
     /// when a wide column is available — keeps the AI from being completely
     /// predictable about the corners while still treating them as exceptions.
     private static let cornerMissileLapseProbability: Double = 0.05
+
+    /// Opponent missile anchors to skip on the player's grass: **columns 0 and 4**
+    /// waste side diagonals off-board; **row 13** wastes southern diagonals (worst at
+    /// corners — `(13,0)` and `(13,4)`).
+    private static func isWastedOpponentMissileAnchor(_ pos: GridPosition) -> Bool {
+        if Zones.missileCornerColumns.contains(pos.col) { return true }
+        if pos.row == 13 { return true }
+        return false
+    }
 
     /// Most recent row-8 grenade column the AI has played. Read by the next
     /// bomber / missile target picker so the follow-up launch reuses the
@@ -58,8 +69,10 @@ struct SmartOpponent: OpponentPolicy {
             result = pickBomberTarget(state: state, belief: belief)
         case .choosingMissileTarget:
             result = pickMissileTarget(state: state, belief: belief)
-        case .bombingDrops:
+        case .bombingDrops, .missileFlight:
             result = nil       // wait for the scheduled advance-bomb-drop tick
+        case .missileInterceptFlight, .bomberInterceptFlight:
+            result = nil
         }
 
         // Save the column whenever we just emitted a row-8 grenade probe so
@@ -179,12 +192,13 @@ struct SmartOpponent: OpponentPolicy {
 
         // SCOUT phase — CG status unresolved and there are still row-8 cells to probe.
         if !cgResolved, !belief.unprobedRow8Cols.isEmpty {
-            // ~65% of the time, take a "safe" launch first if the AI has already
-            // confirmed at least one clear column — otherwise probe. The earlier
-            // bias used to be 30%, but we now favour deploying launchers as soon
-            // as a safe column is known so they aren't sitting ducks for the
-            // player's grenades for half the game.
-            if hasSafeLaunch, Double.random(in: 0..<1) < 0.65 {
+            // After at least one row-8 **miss**, `safeCols` lists columns where the CG
+            // cannot sit — use those for bomber/missile instead of always grenading.
+            // Before any miss we mostly probe; once we have safe columns we strongly
+            // prefer launching (still occasionally probing unfinished row-8 cells).
+            let knowSafeColumnFromMiss = !belief.safeCols.isEmpty
+            let launchFirstProbability = knowSafeColumnFromMiss ? 0.86 : 0.28
+            if hasSafeLaunch, Double.random(in: 0..<1) < launchFirstProbability {
                 if let action = launchAction(bombers: bombers, missiles: missiles, safeCols: safeCols) {
                     return action
                 }
@@ -337,14 +351,12 @@ struct SmartOpponent: OpponentPolicy {
     private mutating func pickMissileTarget(state: GameState, belief: Belief) -> Action? {
         let attacked = attackedCellsAgainstPlayer(state: state)
 
-        // Same row-8 follow-up rule for missiles. Anchoring in a corner column
-        // (0 or 4) wastes 2 of 5 cells, but the user-facing rule "strike where
-        // you just probed" wins over that micro-optimisation — the AI was
-        // willing to probe the column, so it's willing to spend its salvo on
-        // the same column too.
+        // Same row-8 follow-up rule for missiles when the preferred column still yields
+        // a valid anchor — skip south-corner anchors that waste pattern cells off-board.
         if let preferred = preferredLaunchCol, belief.safeCols.contains(preferred) {
             preferredLaunchCol = nil
-            if let pick = missileTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true).randomElement() {
+            if let pick = missileTargets(cols: [preferred], exclude: attacked, avoidFootprintHits: true)
+                .randomElement() {
                 return .tap(pick)
             }
             if let pick = missileTargets(cols: [preferred], exclude: attacked).randomElement() {
@@ -431,6 +443,7 @@ struct SmartOpponent: OpponentPolicy {
         for row in Zones.missileTargetRows(attacker: .opponent) {
             for col in cols {
                 let p = GridPosition(row, col)
+                if Self.isWastedOpponentMissileAnchor(p) { continue }
                 if exclude.contains(p) { continue }
                 if avoidFootprintHits {
                     let footprint = Rules.missilePositions(anchor: p, attacker: .opponent)

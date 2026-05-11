@@ -4,15 +4,15 @@
 //
 //  Top-level switch — welcome vs. play container, plus the modal overlays. Uses one
 //  exhaustive switch over `UIMode` instead of separate optional/bool checks. After a
-//  win or loss, Victory/Defeat appears first; a tap shows the frozen round-start map;
-//  closing the map returns to welcome with the Start game / Guide menu open.
+//  win or loss, Victory/Defeat appears first; tap anywhere to show the frozen round-start map;
+//  tap the map to return to welcome with the Start game / Guide menu open.
 //
 
 import SwiftUI
 
 struct GameRootView: View {
     @Environment(GameStore.self) private var store
-    /// After the outcome screen, shows `OpponentSetupMapView` until closed with X.
+    /// After the outcome screen, shows `OpponentSetupMapView` (**Map overview**) until the player taps to dismiss.
     @State private var showPostGameStartingBoardMap = false
 
     var body: some View {
@@ -93,6 +93,9 @@ private struct PlayContainerView: View {
     private var boardAllowsHitTesting: Bool {
         if store.state.isModalActive { return false }
         if case .play(.bombingDrops) = store.state.phase { return false }
+        if case .play(.missileFlight) = store.state.phase { return false }
+        if case .play(.missileInterceptFlight) = store.state.phase { return false }
+        if case .play(.bomberInterceptFlight) = store.state.phase { return false }
         return true
     }
 

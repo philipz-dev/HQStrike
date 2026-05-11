@@ -12,6 +12,8 @@ enum Action: Equatable {
     case tap(GridPosition)
     /// Internal — the store schedules this 1 s after the previous bomb drop.
     case advanceBombDrop
+    /// Internal — after fly-over timing, applies the full missile X-pattern at once.
+    case commitMissileFlightStrike
     /// Internal — fires once `cooldownDuration` after an attack fully resolves
     /// (excluding HQ kills, which jump straight to victory/defeat). Lifts the
     /// post-attack pause and flips `currentTurn` so the other side can play.
@@ -33,4 +35,10 @@ enum Action: Equatable {
     case finishPostGameMapReview
     /// Internal — `WelcomeView` clears `welcomePresentStartMenu` after applying it.
     case clearWelcomeStartMenuRequest
+    /// Internal — after `Demo_Coastguard`-aligned intercept visuals on `BoardView`,
+    /// commits wreck / shot-down / cooldown state for the player missile intercept.
+    case finalizePlayerMissileIntercept
+    /// Internal — same trailer as missile intercept, for a player bomber shot down
+    /// by the enemy coastguard (`planeInWater`, launcher removal, `.shotDown`).
+    case finalizePlayerBomberIntercept
 }

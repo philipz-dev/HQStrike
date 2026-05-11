@@ -69,7 +69,9 @@ extension GameState {
                 return currentTurn == .player ? .defineBombArea : .opponentThinking
             case .choosingMissileTarget:
                 return currentTurn == .player ? .defineMissileStrike : .opponentThinking
-            case .bombingDrops:
+            case .bombingDrops, .missileFlight:
+                return .none
+            case .missileInterceptFlight, .bomberInterceptFlight:
                 return .none
             }
         }

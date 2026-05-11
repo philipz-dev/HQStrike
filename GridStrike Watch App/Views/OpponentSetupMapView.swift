@@ -5,8 +5,11 @@
 //  Post-game frozen snapshot at round start (`boardAtPlayStart`). Layout deliberately
 //  mirrors `BoardView` (same tile width, no extra top/bottom gutter, same horizontal
 //  padding) so the map renders in the **original grid colours** instead of looking
-//  shrunken or ghosted inside a dark frame. Dismiss uses `PostGameCircularDismissButton`
-//  (top-left ×), matching Victory/Defeat → map navigation.
+//  shrunken or ghosted inside a dark frame. Tap anywhere to finish review and return
+//  to the welcome menu (same action as the former top-left ×).
+//
+//  The top banner is a static **Map overview** label (shown from `GameRootView` after
+//  victory/defeat).
 //
 
 import SwiftUI
@@ -15,9 +18,12 @@ struct OpponentSetupMapView: View {
     let frozenBoard: Board
     let onClose: () -> Void
 
+    private let bannerTitle = "Map overview"
+
     var body: some View {
         GeometryReader { geo in
-            let tileWidth = BoardGridMetrics.tileWidth(forContainerWidth: geo.size.width)
+            let tileWidth = floor(BoardGridMetrics.tileWidth(forContainerWidth: geo.size.width))
+
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
                     ForEach(0..<BoardGridMetrics.rowCount, id: \.self) { row in
@@ -41,20 +47,31 @@ struct OpponentSetupMapView: View {
                 // artwork — instead we keep `isDisabled: false` for full
                 // brightness and stop hit-testing the grid here so taps
                 // never reach a tile in the first place. The ScrollView's
-                // own pan gesture sits *outside* this `.allowsHitTesting`
-                // boundary so vertical scrolling continues to work, and the
-                // close button is a sibling overlay so it stays interactive.
+                // vertical drag gesture still receives scroll; a tap is handled
+                // by `simultaneousGesture` on the outer container.
                 .allowsHitTesting(false)
             }
             .scrollIndicators(.visible)
         }
         .background(Color.black.ignoresSafeArea())
-        .overlay(alignment: .topLeading) {
-            PostGameCircularDismissButton(
-                accessibilityLabel: "Close and return to menu",
-                action: onClose
-            )
+        .overlay(alignment: .top) {
+            Text(bannerTitle)
+                .font(.caption.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .lineLimit(1)
+                .foregroundStyle(.white)
+                .padding(.vertical, 4)
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity)
+                .background(Color.black.opacity(0.55))
+                .allowsHitTesting(false)
         }
+        .simultaneousGesture(
+            TapGesture().onEnded { onClose() }
+        )
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(bannerTitle)
+        .accessibilityHint("Tap anywhere to return to the menu.")
     }
 
     /// Neutral map cells: no overlays, no ghost dim, no disabled-button
@@ -93,6 +110,7 @@ struct OpponentSetupMapView: View {
             northStrikeOverlay: nil,
             dropOverlay: nil,
             dropOverlayScale: 1,
+            missileHitPulseToken: nil,
             waterWreck: nil,
             wreckRotationDegrees: 0,
             border: .plain,

@@ -28,8 +28,6 @@ enum PendingOpponentImpact: Equatable {
     /// Opponent bomber's first drop. Subsequent drops use the existing
     /// `bombingDrops` phase + `advanceBombDrop` ticks.
     case bomber(source: GridPosition, target: GridPosition)
-    /// Opponent missile X-pattern centred on `anchor`.
-    case missile(source: GridPosition, anchor: GridPosition)
 }
 
 /// One queued destruction notification — pairs the side that just attacked
@@ -142,6 +140,13 @@ struct GameState: Equatable {
     /// menu immediately instead of the splash. Cleared once the UI consumes it.
     var welcomePresentStartMenu: Bool
 
+    /// Bumped on each missile salvo so hit tiles can run a one-shot explosion scale pulse.
+    var missileImpactPulseGeneration: UInt32
+
+    /// Defender cells that took a **unit hit** on the latest missile salvo — drives the
+    /// pulse token on `TileRenderModel` until `completeTurn` clears this set.
+    var missileSalvoPulseHitCells: Set<GridPosition>
+
     static func newGame() -> GameState {
         GameState(
             phase: .welcome,
@@ -160,7 +165,9 @@ struct GameState: Equatable {
             lastTurnHighlight: [],
             isInPostAttackCooldown: false,
             scrollRequest: nil,
-            welcomePresentStartMenu: false
+            welcomePresentStartMenu: false,
+            missileImpactPulseGeneration: 0,
+            missileSalvoPulseHitCells: []
         )
     }
 
@@ -208,6 +215,7 @@ extension GameState {
     var shouldDeferDestructionAlert: Bool {
         if isInPostAttackCooldown { return true }
         if case .play(.bombingDrops) = phase { return true }
+        if case .play(.missileFlight) = phase { return true }
         return false
     }
 

@@ -65,8 +65,18 @@ enum PlayState: Equatable {
     /// `attacker` identifies whose weapon got shot down so the banner can pick the
     /// correct phrasing (your bomber vs enemy bomber).
     case shotDown(Weapon, attacker: Side)
+    /// Scripted coastguard intercept (player missile only) — matches `Demo_Coastguard`
+    /// visuals; commit happens on `Action.finalizePlayerMissileIntercept`.
+    case missileInterceptFlight(source: GridPosition, anchor: GridPosition)
+    /// Same coastguard intercept trailer as the missile path, but flying `bomber_transparent`;
+    /// commit on `Action.finalizePlayerBomberIntercept`.
+    case bomberInterceptFlight(source: GridPosition, anchor: GridPosition)
     case choosingBombTarget(source: GridPosition)
     case bombingDrops(source: GridPosition, target: GridPosition, dropsApplied: Int)
+    /// Missile in flight — same scroll + sprite path as bomber (mirrored for the opponent);
+    /// X-pattern commits in one explosion on `commitMissileFlightStrike` when the missile
+    /// crosses the anchor row.
+    case missileFlight(source: GridPosition, anchor: GridPosition, attacker: Side)
     case choosingMissileTarget(source: GridPosition)
 }
 
@@ -104,6 +114,9 @@ extension Phase {
         switch self {
         case .play(.choosingBombTarget(let src)): return src
         case .play(.choosingMissileTarget(let src)): return src
+        case .play(.missileInterceptFlight(let src, _)),
+             .play(.bomberInterceptFlight(let src, _)):
+            return src
         default: return nil
         }
     }

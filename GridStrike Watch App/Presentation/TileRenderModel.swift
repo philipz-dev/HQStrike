@@ -39,6 +39,9 @@ struct TileRenderModel: Equatable {
     let northStrikeOverlay: ExplosionKind?
     let dropOverlay: ExplosionKind?
     let dropOverlayScale: CGFloat
+    /// When non-`nil`, a missile strike **hit** on this cell should play the one-shot
+    /// impact scale pulse (50% → 200% → 100%) — see `GameState.missileSalvoPulseHitCells`.
+    let missileHitPulseToken: UInt32?
     let waterWreck: WaterWreck?
     /// Rotation applied to the water-wreck overlay. Player wrecks (downed by enemy
     /// coastguard) sit at **45°** to suggest the angle of impact; opponent wrecks

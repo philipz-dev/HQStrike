@@ -44,8 +44,10 @@ struct Demo_Coastguard: View {
     /// Intercept explosion: scale 25% → 200%, then fade out.
     private static let interceptExplosionGrowDuration: TimeInterval = 0.14 * 1.2
     private static let interceptExplosionFadeDuration: TimeInterval = 0.24
-    /// Fade-in for the coastguard overlay on row 5.
-    private static let interceptCoastguardFadeDuration: TimeInterval = 2.4 * 1.2
+    /// Fade-in for the coastguard overlay on row 5 (half the prior duration = 2× speed).
+    private static let interceptCoastguardFadeDuration: TimeInterval = (2.4 * 1.2) / 2
+    /// Pause after the intercept beat before the top banner (`Missile intercepted by coastguard!`).
+    private static let delayBeforeInterceptBanner: TimeInterval = 1
 
     // MARK: - Demo layout (row, col)
 
@@ -440,6 +442,7 @@ struct Demo_Coastguard: View {
             try? await Task.sleep(for: .seconds(remaining))
         }
         highlightEnemyAnchor = false
+        try? await Task.sleep(for: .seconds(Self.delayBeforeInterceptBanner))
         withAnimation(.easeOut(duration: 0.2)) {
             showHitBanner = true
         }
@@ -529,6 +532,7 @@ struct Demo_Coastguard: View {
                     northStrikeOverlay: nil,
                     dropOverlay: nil,
                     dropOverlayScale: 1,
+                    missileHitPulseToken: nil,
                     waterWreck: nil,
                     wreckRotationDegrees: 0,
                     border: .plain,

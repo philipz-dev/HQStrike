@@ -52,6 +52,17 @@ enum Rules {
         }
     }
 
+    /// Order in which X-pattern cells should resolve during the player missile fly-over:
+    /// south → north (higher row index first), matching when the vertically travelling
+    /// sprite crosses each row’s midline; ties broken by column.
+    static func missileImpactApplicationOrder(anchor: GridPosition, attacker: Side) -> [GridPosition] {
+        let cells = missilePositions(anchor: anchor, attacker: attacker)
+        return cells.sorted { a, b in
+            if a.row != b.row { return a.row > b.row }
+            return a.col < b.col
+        }
+    }
+
     // MARK: - Coastguard interception
 
     /// Bomber: intercepted when the column matches the defender's coastguard column AND

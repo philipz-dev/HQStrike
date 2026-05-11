@@ -13,28 +13,35 @@ struct TileView: View, Equatable {
     let tileSize: CGFloat
     let onTap: () -> Void
 
+    @State private var missileHitPulseScale: CGFloat = 1
+
     static func == (lhs: TileView, rhs: TileView) -> Bool {
         lhs.model == rhs.model && lhs.tileSize == rhs.tileSize
     }
 
     var body: some View {
-        Button(action: onTap) {
-            ZStack {
-                background
-                ghostScrim
-                offCoastguardScrim
-                strikeOverlayView
-                dropOverlayView
-                wreckOverlayView
-                borderRect
-            }
-            .compositingGroup()
-            .opacity(model.offCoastguardFocusRow ? 0.88 : 1)
-            .frame(width: tileSize, height: tileSize)
-            .clipShape(Rectangle())
+        ZStack {
+            background
+            ghostScrim
+            offCoastguardScrim
+            strikeOverlayView
+            dropOverlayView
+            wreckOverlayView
+            borderRect
         }
-        .buttonStyle(.plain)
-        .disabled(model.isDisabled)
+        .compositingGroup()
+        .opacity(model.offCoastguardFocusRow ? 0.88 : 1)
+        .frame(width: tileSize, height: tileSize)
+        .clipShape(Rectangle())
+        // `Button` Enforces a platform minimum touch target (~44×44 pt) even with
+        // `.plain` — rows are ~36 pt tall, so adjacent targets overlap vertically
+        // and taps land on the wrong `GridPosition`. A clipped rect + tap gesture
+        // keeps hits aligned with the drawn tile.
+        .contentShape(Rectangle())
+        .onTapGesture {
+            guard !model.isDisabled else { return }
+            onTap()
+        }
     }
 
     // MARK: - Layers
@@ -85,13 +92,38 @@ struct TileView: View, Equatable {
     @ViewBuilder
     private var dropOverlayView: some View {
         if let kind = model.dropOverlay {
-            Assets.explosionImage(for: kind)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(width: tileSize * 0.92, height: tileSize * 0.92)
-                .scaleEffect(model.dropOverlayScale)
-                .allowsHitTesting(false)
+            if kind == .hit, model.missileHitPulseToken != nil {
+                Assets.explosionImage(for: kind)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: tileSize * 0.92, height: tileSize * 0.92)
+                    .scaleEffect(model.dropOverlayScale * missileHitPulseScale)
+                    .allowsHitTesting(false)
+                    .onChange(of: model.missileHitPulseToken) { _, token in
+                        guard token != nil else { return }
+                        missileHitPulseScale = 0.5
+                        withAnimation(.easeOut(duration: 0.12)) {
+                            missileHitPulseScale = 2.0
+                        }
+                        Task {
+                            try? await Task.sleep(for: .milliseconds(120))
+                            await MainActor.run {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    missileHitPulseScale = 1.0
+                                }
+                            }
+                        }
+                    }
+            } else {
+                Assets.explosionImage(for: kind)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(width: tileSize * 0.92, height: tileSize * 0.92)
+                    .scaleEffect(model.dropOverlayScale)
+                    .allowsHitTesting(false)
+            }
         }
     }
 

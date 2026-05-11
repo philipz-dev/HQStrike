@@ -972,6 +972,8 @@ struct Demo_Bomber: View {
 
                     dropOverlayScale: missileImpactOverlayScales[pos] ?? 1,
 
+                    missileHitPulseToken: nil,
+
                     waterWreck: nil,
 
                     wreckRotationDegrees: 0,

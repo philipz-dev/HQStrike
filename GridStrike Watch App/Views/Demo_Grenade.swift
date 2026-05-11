@@ -343,6 +343,7 @@ struct Demo_Grenade: View {
                     northStrikeOverlay: nil,
                     dropOverlay: dropOverlay,
                     dropOverlayScale: 1,
+                    missileHitPulseToken: nil,
                     waterWreck: nil,
                     wreckRotationDegrees: 0,
                     border: .plain,
