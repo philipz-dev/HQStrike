@@ -2,10 +2,9 @@
 //  SetupConfirmOverlay.swift
 //  GridStrike Watch App
 //
-//  Two translucent buttons that appear after the player places their last
-//  unit. The board renders normally underneath so the player can review their
-//  layout — the red ✗ wipes the board and rewinds setup, the green ✓ commits
-//  the layout and starts the round.
+//  After the player places their last unit, two equal-size circular actions appear
+//  along the bottom: red ✗ restarts setup, green ✓ confirms. The board stays visible
+//  underneath so the player can review the layout before committing.
 //
 
 import SwiftUI
@@ -15,38 +14,39 @@ struct SetupConfirmOverlay: View {
     let onConfirm: () -> Void
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .topLeading) {
-                TopLeadingTacticalCloseBar(
-                    isVisible: true,
-                    style: .destructive,
-                    accessibilityLabel: "Restart setup",
-                    screenHeight: geo.size.height,
-                    upwardOffset: TopLeadingTacticalCloseBar.hubOffsetUp,
-                    action: onRestart
-                )
+        ZStack {
+            VStack {
+                Spacer(minLength: 0)
+                HStack(spacing: 0) {
+                    ZStack {
+                        ConfirmCircleButton(
+                            systemName: "xmark",
+                            tint: .red,
+                            action: onRestart
+                        )
+                        .accessibilityLabel("Restart setup")
+                    }
+                    .frame(maxWidth: .infinity)
 
-                VStack {
-                    Spacer()
-                    HStack(spacing: 10) {
-                        Spacer(minLength: 0)
+                    ZStack {
                         ConfirmCircleButton(
                             systemName: "checkmark",
                             tint: .green,
                             action: onConfirm
                         )
                         .accessibilityLabel("Confirm setup")
-                        Spacer(minLength: 0)
                     }
-                    .padding(.bottom, 4)
+                    .frame(maxWidth: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, 12)
+                .padding(.bottom, 4)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 }
 
-/// Translucent circular button for the green ✓ only. The red ✗ uses `TacticalCloseButton` (destructive style).
+/// Translucent circular setup actions — same diameter for cancel (✗) and confirm (✓).
 private struct ConfirmCircleButton: View {
     let systemName: String
     let tint: Color

@@ -4,15 +4,15 @@
 //
 //  Top-level switch — `.welcome` shows `StartView` (splash + tactical menu); in-game UI is
 //  `PlayContainerView` with modal overlays. One exhaustive switch over `UIMode`. After a win
-//  or loss, Victory/Defeat appears first; tap anywhere to show the frozen round-start map;
-//  tap the map to return to `.welcome` with the tactical menu open (splash skipped).
+//  or loss, Victory/Defeat appear full-screen with a top-leading ×; close opens the frozen
+//  round-start map; map × returns to `.welcome` with the tactical menu open (splash skipped).
 //
 
 import SwiftUI
 
 struct GameRootView: View {
     @Environment(GameStore.self) private var store
-    /// After the outcome screen, shows `OpponentSetupMapView` (**Map overview**) until the player taps to dismiss.
+    /// After the outcome screen, shows `OpponentSetupMapView` (frozen round-start board, “Setup” banner) until the player taps close.
     @State private var showPostGameStartingBoardMap = false
 
     var body: some View {
@@ -38,7 +38,6 @@ struct GameRootView: View {
                         store.send(.finishPostGameMapReview)
                     }
                 } else {
-                    PlayContainerView(snapshot: snapshot)
                     VictoryOverlay {
                         showPostGameStartingBoardMap = true
                     }
@@ -52,7 +51,6 @@ struct GameRootView: View {
                         store.send(.finishPostGameMapReview)
                     }
                 } else {
-                    PlayContainerView(snapshot: snapshot)
                     DefeatOverlay {
                         showPostGameStartingBoardMap = true
                     }

@@ -6,7 +6,7 @@
 
 //  Scripted trailer: hand → bomber tile → scroll to enemy; tap → pauses → scroll so rows 5–6 sit on the bottom edge → bomber flies while board scrolls to top;
 
-//  impacts (miss / miss / hit on the northernmost drop row) fire as the plane passes each row — dismiss with the top-left ✕ when the trailer ends.
+//  impacts (miss / hit / miss on the middle drop of the 3) fire as the plane passes each row — dismiss with the top-left ✕ when the trailer ends.
 
 //
 
@@ -58,6 +58,10 @@ struct Demo_Bomber: View {
 
     private static let handFlyToHomeMissileDuration: TimeInterval = 0.75
 
+    /// Hold opening frame (board + hand at home, bottom pinned) before the first hand motion.
+
+    private static let freezeBeforeHandMotion: TimeInterval = 0.5
+
     private static let scrollToTopDuration: TimeInterval = 2
 
     /// Dwell when the hand rests on the bomber tile or on the enemy tile before the scripted tap.
@@ -105,9 +109,13 @@ struct Demo_Bomber: View {
 
     private static let enemyBomberTarget = GridPosition(3, 1)
 
-    /// Final bomber-drop hit cell: HQ tile art + same pulse path as `Demo_Grenade` (`HeadquarterTile` underlay).
+    /// Middle cell of the 3-drop column from `enemyBomberTarget` — scripted HQ elimination pulse (`HeadquarterTile` underlay).
 
-    private static let bomberDemoHqHitTile = GridPosition(1, 1)
+    private static let bomberDemoHqHitTile: GridPosition = {
+        let drops = Rules.bombingPositions(target: Self.enemyBomberTarget, attacker: .player)
+        precondition(drops.count == 3, "Demo bomber expects a 3-cell bombing footprint.")
+        return drops[1]
+    }()
 
     /// Settle time for that pulse (matches `TileView` hit animation).
 
@@ -348,13 +356,13 @@ struct Demo_Bomber: View {
 
 
 
-                // Same placement + typography as `InstructionBanner` / “Start attack!”
+                // Same placement + typography as `InstructionBanner` / `Demo_Missile` top bar.
 
                 VStack(spacing: 0) {
 
-                    if showHitBanner {
+                    if isBoardVisible {
 
-                        Text("HQ eliminated!")
+                        Text(showHitBanner ? "HQ eliminated!" : "Deploying bombers")
 
                             .font(.caption.weight(.semibold))
 
@@ -511,7 +519,7 @@ struct Demo_Bomber: View {
 
         showHand = true
 
-
+        try? await Task.sleep(for: .seconds(Self.freezeBeforeHandMotion))
 
         let handOnBomberTile = Self.handCentreWithTopOfFrameAtTileLowerThird(
 
@@ -645,7 +653,7 @@ struct Demo_Bomber: View {
 
         let drops = Rules.bombingPositions(target: Self.enemyBomberTarget, attacker: .player)
 
-        let kinds: [ExplosionKind] = [.miss, .miss, .hit]
+        let kinds: [ExplosionKind] = [.miss, .hit, .miss]
 
 
 

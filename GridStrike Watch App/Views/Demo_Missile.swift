@@ -2,7 +2,7 @@
 //  Demo_Missile.swift
 //  GridStrike Watch App
 //
-//  Scripted trailer: hand visible at home immediately, 0.5s hold, then hand → home missile → enemy anchor tap; scroll pins row 6; `missiletransparent`
+//  Scripted trailer: hand visible at home immediately, 0.5s hold, then hand → left home missile (row 11, col 0) → enemy anchor tap; scroll pins row 6; `missiletransparent`
 //  flies up the anchor column while the board scrolls to top; salvo + sprite removal when the centre crosses
 //  row 2 mid plus **half a sprite height** south; opacity hides once the bottom clears half that height below the top.
 //
@@ -42,7 +42,7 @@ struct Demo_Missile: View {
     private static let missileFlightDuration: TimeInterval = 3.35
     /// Missile sprite width/height as a multiple of tile width (matches scroll geometry).
     private static let missileFlightSpriteTileFactor: CGFloat = 1.22
-    /// Hand flies to `demoMissile2` (matches prior missile demo pacing).
+    /// Hand flies to `demoMissile1` (left missile, row 11 col 0).
     private static let handFlyToHomeMissileDuration: TimeInterval = 1.75
 
     /// Hold opening frame (board + hand at home, bottom pinned) before the first hand motion.
@@ -62,9 +62,9 @@ struct Demo_Missile: View {
     private static let handStartTile = GridPosition(12, 2)
     private static let handStartHorizontalOffsetTiles: CGFloat = 1.5
 
-    /// Salvo cell that shows `.hit` (north-west of `enemyMissileAnchor`); drives the same pulse as `Demo_Grenade`.
+    /// Salvo cell that shows `.hit` (south-west / lower-left diagonal of the X around `enemyMissileAnchor`).
     private static let missileSalvoHitTile = GridPosition(
-        Self.enemyMissileAnchor.row - 1,
+        Self.enemyMissileAnchor.row + 1,
         Self.enemyMissileAnchor.col - 1
     )
 
@@ -168,9 +168,10 @@ struct Demo_Missile: View {
                     }
                 }
 
+                // Same placement + typography as `InstructionBanner` / `Demo_Grenade` top bar.
                 VStack(spacing: 0) {
-                    if showHitBanner {
-                        Text("Bomber eliminated!")
+                    if isBoardVisible {
+                        Text(showHitBanner ? "Bomber eliminated!" : "Deploying missiles")
                             .font(.caption.weight(.semibold))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
@@ -250,8 +251,8 @@ struct Demo_Missile: View {
         let tw = BoardGridMetrics.tileWidth(forContainerWidth: size.width)
 
         let handOnMissile = Self.handCentreWithTopOfFrameAtTileLowerThird(
-            row: Self.demoMissile2.row,
-            col: Self.demoMissile2.col,
+            row: Self.demoMissile1.row,
+            col: Self.demoMissile1.col,
             viewportSize: size,
             pullDown: pullDown,
             scrollBottomPinned: true
@@ -479,7 +480,7 @@ struct Demo_Missile: View {
                 }()
 
                 let highlight =
-                    (highlightPlayerMissile && pos == Self.demoMissile2)
+                    (highlightPlayerMissile && pos == Self.demoMissile1)
                     || (highlightEnemyAnchor && pos == Self.enemyMissileAnchor)
 
                 let bomberRotationDegrees: Double = {

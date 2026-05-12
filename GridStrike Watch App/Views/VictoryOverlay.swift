@@ -2,11 +2,9 @@
 //  VictoryOverlay.swift
 //  GridStrike Watch App
 //
-//  End-of-game celebration screen. The full-bleed `victoryBackground`
-//  illustration ignores the safe area so it completely covers the play
-//  container behind it. Title sits toward the bottom; tap anywhere to advance
-//  to the round-start map. After 5 seconds without a tap, “Tap to continue”
-//  appears centered on the vertical axis.
+//  End-of-game celebration: full-bleed `victoryBackground`, title anchored low in the
+//  lower third. Close control uses the same `GeometryReader` + overlay + `screenHeight`
+//  math as `DemoTopCloseButton` (default upward offset). Close advances to the setup map.
 //
 
 import SwiftUI
@@ -14,75 +12,58 @@ import SwiftUI
 struct VictoryOverlay: View {
     let onContinue: () -> Void
 
-    @State private var showTapHint = false
-    @State private var tapHintTask: Task<Void, Never>?
-
     var body: some View {
-        ZStack {
-            Color.black
-                .ignoresSafeArea()
+        GeometryReader { geo in
+            let lowerThird = geo.size.height / 3
+            let bottomInset = max(geo.safeAreaInsets.bottom, 4)
+            let titleLiftFromBottom: CGFloat = 2
 
-            Assets.victoryBackground
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .ignoresSafeArea()
+            ZStack(alignment: .topLeading) {
+                Color.black
+                    .ignoresSafeArea()
 
-            Color.black.opacity(0.30)
-                .ignoresSafeArea()
+                Assets.victoryBackground
+                    .renderingMode(.original)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
 
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
-                Text("Victory!")
-                    .font(.title2.weight(.bold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.9), radius: 5, y: 2)
-                    .padding(.horizontal, 10)
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(true)
 
-                Spacer()
-                    .frame(height: 14)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            if showTapHint {
-                VStack {
-                    Spacer()
-                    Text("Tap to continue")
-                        .font(.subheadline.weight(.medium))
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Text("Victory!")
+                        .font(.title2.weight(.bold))
                         .multilineTextAlignment(.center)
-                        .foregroundStyle(.white.opacity(0.92))
-                        .shadow(color: .black.opacity(0.85), radius: 3, y: 1)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.9), radius: 5, y: 2)
                         .padding(.horizontal, 10)
-                    Spacer()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: lowerThird, alignment: .bottom)
+                        .padding(.bottom, bottomInset + titleLiftFromBottom)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
             }
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            tapHintTask?.cancel()
-            tapHintTask = nil
-            onContinue()
-        }
-        .onAppear {
-            showTapHint = false
-            tapHintTask?.cancel()
-            tapHintTask = Task { @MainActor in
-                try? await Task.sleep(for: .seconds(5))
-                guard !Task.isCancelled else { return }
-                showTapHint = true
+            .overlay(alignment: .topLeading) {
+                TopLeadingTacticalCloseBar(
+                    isVisible: true,
+                    accessibilityLabel: "Close",
+                    accessibilityHint: "Opens setup map",
+                    screenHeight: geo.size.height,
+                    action: onContinue
+                )
             }
         }
-        .onDisappear {
-            tapHintTask?.cancel()
-            tapHintTask = nil
-        }
-        .allowsHitTesting(true)
+        .background(Color.black.ignoresSafeArea())
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Victory")
-        .accessibilityHint("Tap anywhere to continue.")
+        .accessibilityHint("Opens setup map.")
     }
 }

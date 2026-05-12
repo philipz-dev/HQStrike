@@ -33,12 +33,9 @@ enum Assets {
     static let planeInWater = Image("PlaneInWater")
     static let missileInWater = Image("MissileInWater")
     static let splashBackground = Image("SplashBackground")
-    /// Full-bleed art shown behind the Victory overlay — celebratory soldier
-    /// silhouette painted to read against the dark scrim that hosts the title.
+    /// Full-bleed art for the win screen — painted to read with title shadows (no extra dimming layer).
     static let victoryBackground = Image("VictoryBackground")
-    /// Mirror of `victoryBackground` for the defeat path. Same composition
-    /// language (single soldier, sunset sky) so the two end-game screens
-    /// feel like a paired set.
+    /// Full-bleed art for the lose screen — paired with `victoryBackground` (no extra dimming layer).
     static let defeatBackground = Image("DefeatBackground")
 
     /// Manual hub: full-screen camouflage + weapon picker tiles.

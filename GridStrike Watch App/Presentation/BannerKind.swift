@@ -18,6 +18,8 @@ enum BannerKind: Equatable {
     /// fire their first bomb / missile / grenade.
     case startAttack
     case opponentThinking
+    /// Post-game frozen round-start map (`OpponentSetupMapView`).
+    case postGameSetupMap
 
     var localized: String {
         switch self {
@@ -40,6 +42,8 @@ enum BannerKind: Equatable {
             return "Start attack!"
         case .opponentThinking:
             return "Thinking…"
+        case .postGameSetupMap:
+            return "Setup"
         }
     }
 }
@@ -50,6 +54,7 @@ extension GameState {
         case .destructionAlert, .victory, .defeat, .welcome, .setupConfirm:
             // `.setupConfirm` mutes the banner so the floating confirm buttons
             // are the only thing competing with the board for attention.
+            // `postGameSetupMap` is only used from `OpponentSetupMapView`, not here.
             return .none
         case .setup(let step):
             return .place(step)

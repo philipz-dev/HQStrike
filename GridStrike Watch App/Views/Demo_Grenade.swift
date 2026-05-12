@@ -150,9 +150,10 @@ struct Demo_Grenade: View {
                     }
                 }
 
+                // Same placement + typography as `InstructionBanner` / other demo top bars.
                 VStack(spacing: 0) {
-                    if showGrenadeMissBanner {
-                        Text("Missile eliminated!")
+                    if isBoardVisible {
+                        Text(showGrenadeMissBanner ? "Missile eliminated!" : "Deploying grenades")
                             .font(.caption.weight(.semibold))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
