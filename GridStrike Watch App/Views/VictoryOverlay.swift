@@ -2,8 +2,8 @@
 //  VictoryOverlay.swift
 //  GridStrike Watch App
 //
-//  End-of-game celebration: full-bleed `victoryBackground`, title anchored low in the
-//  lower third. Close control uses the same `GeometryReader` + overlay + `screenHeight`
+//  End-of-game celebration: full-bleed `victoryBackground`, title vertically centered
+//  in the lower third. Close control uses the same `GeometryReader` + overlay + `screenHeight`
 //  math as `DemoTopCloseButton` (default upward offset). Close advances to the setup map.
 //
 
@@ -16,7 +16,6 @@ struct VictoryOverlay: View {
         GeometryReader { geo in
             let lowerThird = geo.size.height / 3
             let bottomInset = max(geo.safeAreaInsets.bottom, 4)
-            let titleLiftFromBottom: CGFloat = 2
 
             ZStack(alignment: .topLeading) {
                 Color.black
@@ -45,8 +44,8 @@ struct VictoryOverlay: View {
                         .shadow(color: .black.opacity(0.9), radius: 5, y: 2)
                         .padding(.horizontal, 10)
                         .frame(maxWidth: .infinity)
-                        .frame(height: lowerThird, alignment: .bottom)
-                        .padding(.bottom, bottomInset + titleLiftFromBottom)
+                        .frame(height: lowerThird, alignment: .center)
+                        .padding(.bottom, bottomInset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)

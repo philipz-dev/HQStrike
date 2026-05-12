@@ -2,7 +2,7 @@
 //  DefeatOverlay.swift
 //  GridStrike Watch App
 //
-//  Lose path: full-bleed `defeatBackground`, title and subtitle anchored low in the
+//  Lose path: full-bleed `defeatBackground`, title and subtitle vertically centered in the
 //  lower third. Close control matches `DemoTopCloseButton` geometry (default offset).
 //  Close advances to the setup map.
 //
@@ -16,7 +16,6 @@ struct DefeatOverlay: View {
         GeometryReader { geo in
             let lowerThird = geo.size.height / 3
             let bottomInset = max(geo.safeAreaInsets.bottom, 4)
-            let titleLiftFromBottom: CGFloat = 2
 
             ZStack(alignment: .topLeading) {
                 Color.black
@@ -53,8 +52,8 @@ struct DefeatOverlay: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(height: lowerThird, alignment: .bottom)
-                    .padding(.bottom, bottomInset + titleLiftFromBottom)
+                    .frame(height: lowerThird, alignment: .center)
+                    .padding(.bottom, bottomInset)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .allowsHitTesting(false)
