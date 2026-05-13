@@ -34,9 +34,9 @@
         header { padding: 80px 20px 40px 20px; text-align: center; }
 
         .app-icon { 
-            width: 110px; 
-            height: auto; 
-            max-height: 110px;
+            width: 110px;        /* Forceert breedte op 110px */
+            height: auto;        /* Hoogte schaalt automatisch mee */
+            display: block;      /* Voorkomt extra witruimte onderaan */
             border-radius: 24px; 
             margin-bottom: 25px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
@@ -64,7 +64,6 @@
         .feature-box h3 { color: var(--apple-red); margin-top: 0; font-size: 1.2rem; margin-bottom: 10px; }
         .feature-box p { line-height: 1.5; color: var(--text-main); margin: 0; }
 
-        /* Intel Grid / Scroll */
         .screenshots-scroll { 
             display: flex; 
             overflow-x: auto; 
