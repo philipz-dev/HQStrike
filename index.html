@@ -34,7 +34,9 @@
         header { padding: 80px 20px 40px 20px; text-align: center; }
 
         .app-icon { 
-            width: 110px; height: 110px; 
+            width: 110px; 
+            height: auto; 
+            max-height: 110px;
             border-radius: 24px; 
             margin-bottom: 25px; 
             box-shadow: 0 10px 30px rgba(0,0,0,0.6); 
@@ -102,13 +104,6 @@
             display: block;
         }
 
-        .item-label {
-            font-size: 0.7rem;
-            color: var(--text-dim);
-            margin-top: 8px;
-            text-align: center;
-        }
-
         footer { padding: 60px; color: var(--text-dim); font-size: 0.85rem; text-align: center; }
         a { color: var(--apple-blue); text-decoration: none; }
     </style>
@@ -151,41 +146,5 @@
                     <source src="shot01_final.mp4" type="video/mp4">
                 </video>
             </div>
-            
-            <div class="screenshot-item">
-                <img src="shot02.png" alt="Map Hunt">
-            </div>
-
-            <div class="screenshot-item">
-                <img src="shot03.png" alt="Targeting System">
-            </div>
-
-            <div class="screenshot-item">
-                <img src="shot04.png" alt="Impact Confirmed">
-            </div>
-
-            <div class="screenshot-item">
-                <img src="shot05.png" alt="Assault Menu">
-            </div>
-
-            <div class="screenshot-item">
-                <img src="shot06.png" alt="HQ Strike Logo Intel">
-            </div>
-        </div>
-        <p style="color: var(--text-dim); font-size: 0.8rem; margin-top: 15px; text-align: center;">&larr; Swipe for all field images &rarr;</p>
-    </div>
-
-    <div class="container">
-        <h3>Support & Privacy</h3>
-        <p>Questions about the mission? Contact: <a href="mailto:gridstrike@gmail.com">gridstrike@gmail.com</a></p>
-        <hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">
-        <p><strong>Privacy Policy:</strong> HQ Strike does not collect data. Your mission results are encrypted and stored locally on your watch.</p>
-    </div>
-
-    <footer>
-        &copy; 2026 Philipz Software. All rights reserved.<br>
-        <a href="https://github.com/philipz-dev/HQStrike">View Source on GitHub</a>
-    </footer>
-
-</body>
-</html>
+            <div class="screenshot-item"><img src="shot02.png" alt="Map Hunt"></div>
+            <div class="screenshot-item"><img src="shot03.png" alt
